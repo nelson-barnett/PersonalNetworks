@@ -1,4 +1,4 @@
-################################################################################
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # PROJECT: Process Persnet
 # PURPOSE: Organize and analyze egonetwork data from the persnet instrument
 # DIR:     ""
@@ -13,14 +13,16 @@
 # LATEST:  06/08/2025
 # PSERIES: NA
 # NSERIES: NA
-###############################################################################
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-###############################################################################
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # This file will not run if the following occurs:
 # 1. igraph, tidyverse, tidygraph go through a major update
 # 2. the way in which persnet data is loaded changes (e.g. character vs numeric)
 # 3. different variable names, but instructions to adjust are included below
-###############################################################################
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+################################# Code Setup ##################################
 
 #Clearing Working Directory
 rm(list = ls())
@@ -44,21 +46,21 @@ library(rstudioapi)
 setwd(dirname(getActiveDocumentContext()$path))
 
 #Importing data
-df_input <- read.csv("20180807_PersonalNetwork_data.csv",
+df_input <- read.csv("fake_data.csv",
                      stringsAsFactors = FALSE,
                      colClasses = c(zip = "character")) #this reads in zip retains 0s
 
 ################### Establishing Network Graph Functions ######################
 
 remove_ego_from_igraph <- function(tg_graph) {
-  ##########
+  # # # # # # # #
   # Function: Removes the ego node from a tidygraph object, returning  
   #           a graph without the ego.
   # Inputs:  
   #   tg_graph = A tidygraph object representing a personal network
   # Outputs:  
   #   A tidygraph object without the ego node
-  ##########
+  # # # # # # # #
   
   tg_graph_egoless <- tg_graph %>%
     tidygraph::activate(nodes) %>%
@@ -68,12 +70,12 @@ remove_ego_from_igraph <- function(tg_graph) {
 }
 
 organize_row_to_tidygraph <- function(df_row_input) {
-  ##########
+  # # # # # # # #
   # Function: Converts a single row of a personal network data frame into  
   #           a tidygraph object, representing network ties
   # Inputs: df_row_input = A single row of a personal network data frame
   # Outputs: A tidygraph object representing the network structure
-  ##########
+  # # # # # # # #
   
   # Extract personal network (psn) tie values from the input row
   psn_edges_variables <- dplyr::select(df_row_input, tie1:a_tie105)
@@ -141,12 +143,12 @@ organize_row_to_tidygraph <- function(df_row_input) {
 }
 
 organize_list_tidygraphs <- function(persnet_df) {
-  ##########
+  # # # # # # # #
   # Function: Converts a personal network data frame into a list of tidygraph 
   #           objects, with each row representing an individual network.
   # Inputs: persnet_df = A personal network data frame
   # Outputs: A list of tidygraph objects
-  ##########
+  # # # # # # # #
   
   # Split the data frame into a list of individual rows
   df_as_list <- persnet_df %>%
@@ -328,7 +330,7 @@ diet
 ############################## Health Problems ################################
 
 extract_health_problems <- function(persnet_row, health_numeric) {
-  ##########
+  # # # # # # # #
   # Function: Extracts a specific health problem label from a single row of a personal
   #           network dataframe. The function checks a set of predefined health problem
   #           columns and returns the health label corresponding to the nth (health_numeric)
@@ -354,7 +356,7 @@ extract_health_problems <- function(persnet_row, health_numeric) {
   #   - If there are enough flagged health problems, the function returns the label for the
   #     health problem at the specified position (e.g., the 1st, 2nd, or 3rd problem).
   #   - If there are fewer flagged health problems than requested, the function returns NA.
-  ##########
+  # # # # # # # #
   health_labels <- c("General","Pain","Cognitive_MentalHealth",
                      "Cardiac","NoProblems")
   #tweak name of health columns here if need be
@@ -393,7 +395,7 @@ health_prob4
 ###################### Total Network Size (Unique Alters) #####################
 
 calc_total_alters_row <- function(persnet_row) {
-  ##########
+  # # # # # # # #
   # Function: Computes the total number of unique alters in a given  
   #           personal network row, combining named alters and additional  
   #           names listed in "more_names" columns.
@@ -401,7 +403,7 @@ calc_total_alters_row <- function(persnet_row) {
   #   persnet_row = A single row of a personal network data frame
   # Outputs:  
   #   Total count of unique alters in the network
-  ##########
+  # # # # # # # #
   
   # check if inout is valid
   if (is.null(persnet_row) || !"data.frame" %in% class(persnet_row)) {
@@ -453,14 +455,14 @@ network_size
 ########################### Network Density ###################################
 
 calc_egoless_density <- function(tg_graph) {
-  ##########
+  # # # # # # # #
   # Function: Computes the density of a personal network graph after  
   #           removing the ego node.
   # Inputs:  
   #   tg_graph = A tidygraph object representing a personal network
   # Outputs:  
   #   Density of the network without the ego node (rounded to 2 decimal places)
-  ##########
+  # # # # # # # #
   
   return(round(igraph::edge_density(remove_ego_from_igraph(tg_graph)), 2))
 }
@@ -484,7 +486,7 @@ density
 ######################### Network Constraint ##################################
 
 calc_node_constraint <- function(tidygra, node_index = NULL) {
-  ##########
+  # # # # # # # #
   # Function: Computes Burt's Constraint measure for a specified node  
   #           in a tidygraph object, quantifying structural holes.
   # Inputs:  
@@ -493,7 +495,7 @@ calc_node_constraint <- function(tidygra, node_index = NULL) {
   # (default = "ego")
   # Outputs:  
   #   Burt's Constraint value for the specified node
-  ##########
+  # # # # # # # #
   
   # test if the input is a valid tidygraph object
   if (is.null(tidygra) || !"tbl_graph" %in% class(tidygra)) {
@@ -560,7 +562,7 @@ constraint
 ######################### Effective Network Size ##############################
 
 calc_node_ens <- function(tidygra, node_index = NULL) {
-  ##########
+  # # # # # # # #
   # Function: Computes the Effective Network Size (ENS) for a specified node 
   #           in a tidygraph object, considering tie strengths.
   # Inputs:  
@@ -568,7 +570,7 @@ calc_node_ens <- function(tidygra, node_index = NULL) {
   #   node_index = (Optional) The node for which ENS is calculated (default = "ego")
   # Outputs:  
   #   Effective Network Size (ENS) value for the specified node
-  ##########
+  # # # # # # # #
   
   # Test if the input is valid
   if (is.null(tidygra) || !"tbl_graph" %in% class(tidygra)) {
@@ -642,14 +644,14 @@ effsize
 ############################ Mean Degree ######################################
 
 calc_egoless_mean_degree <- function(tg_graph) {
-  ##########
+  # # # # # # # #
   # Function: Computes the mean degree of nodes in a personal  
   #           network after removing the ego node.
   # Inputs:  
   #   tg_graph = A tidygraph object representing a personal network
   # Outputs:  
   #   Mean degree of nodes in the network (excluding ego)
-  ##########
+  # # # # # # # #
   
   tryCatch({
     # Remove ego
@@ -675,14 +677,14 @@ mean_degree
 ########################## Max Degree #########################################
 
 calc_egoless_max_degree <- function(tg_graph) {
-  ##########
+  # # # # # # # #
   # Function: Computes the maximum degree of nodes in a personal  
   #           network after removing the ego node.
   # Inputs:  
   #   tg_graph = A tidygraph object representing a personal network
   # Outputs:  
   #   Maximum degree of nodes in the network (excluding ego)
-  ##########
+  # # # # # # # #
   
   tryCatch({
     # Remove ego
@@ -710,7 +712,7 @@ max_degree
 ########################### Relationship Type #################################
 
 calc_prop_alters_relationship <- function(persnet_row, relationship_type) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters with a specified relationship  
   #           type in a personal network row.
   # Inputs:  
@@ -719,7 +721,7 @@ calc_prop_alters_relationship <- function(persnet_row, relationship_type) {
   #                      'coworker', or 'other'
   # Outputs:  
   #   Proportion of alters with the specified relationship type
-  ##########
+  # # # # # # # #
   
   # Relationship types mapped to numeric codes
   relationship_map <- c(
@@ -793,7 +795,7 @@ age_sd
 ####################### Diversity Calculation Functions #######################
 
 calc_blau_alter_heterophily <- function(persnet_row, attribute = NULL) {
-  ##########
+  # # # # # # # #
   # Function: Computes the Blau heterophily index for a specified alter attribute.  
   #           The index measures diversity within a personal network.
   # Inputs:  
@@ -804,7 +806,7 @@ calc_blau_alter_heterophily <- function(persnet_row, attribute = NULL) {
   #                 (how often alters speak to ego)
   # Outputs:  
   #   Blau heterophily index for the specified attribute
-  ##########
+  # # # # # # # #
   
   valid_attributes <- c(
     "gender", "educ", 
@@ -897,7 +899,7 @@ calc_blau_alter_heterophily <- function(persnet_row, attribute = NULL) {
 }
 
 calc_attribute_iqv <- function(persnet_row, attribute = NULL) {
-  ##########
+  # # # # # # # #
   # Function: Computes the Index of Qualitative Variation (IQV) for a specified
   #           alter attribute. The IQV measures diversity and variation within
   #           a personal network.
@@ -907,7 +909,7 @@ calc_attribute_iqv <- function(persnet_row, attribute = NULL) {
   #                 or 'support' (types of support)
   # Outputs:
   #   IQV value for the specified attribute
-  ##########
+  # # # # # # # #
   
   # define valid attributes for IQV calculation
   valid_attributes <- c(
@@ -967,7 +969,7 @@ iqv_sex
 ############################## Race Diversity #################################
 
 calc_prop_alters_race_identity <- function(persnet_row, race_category) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who belong to a specified  
   #           racial category.
   # Inputs:  
@@ -976,7 +978,7 @@ calc_prop_alters_race_identity <- function(persnet_row, race_category) {
   #                   'asian', 'pacific_islander', or 'unknown'
   # Outputs:  
   #   Proportion of alters within the specified racial category
-  ##########
+  # # # # # # # #
   
   # Map race categories to numeric codes
   race_map <- c(
@@ -1018,7 +1020,7 @@ iqv_race
 ######################### Diversity of Education ##############################
 
 calc_prop_alters_education_level <- function(persnet_row, education_level) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who fall into a specified  
   #           education level category.
   # Inputs:  
@@ -1027,7 +1029,7 @@ calc_prop_alters_education_level <- function(persnet_row, education_level) {
   #                     'college_grad', or 'dont_know'
   # Outputs:  
   #   Proportion of alters within the specified education level
-  ##########
+  # # # # # # # #
   
   # Map education levels to numeric codes
   education_map <- list(
@@ -1066,7 +1068,7 @@ iqv_educ
 ####################### Frequency of Interaction ##############################
 
 calc_prop_alters_freq_speak <- function(persnet_row, frequency) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who speak to the ego  
   #           at a specified frequency.
   # Inputs:  
@@ -1074,7 +1076,7 @@ calc_prop_alters_freq_speak <- function(persnet_row, frequency) {
   #   frequency   = One of 'daily', 'weekly', 'monthly', 'more_monthly', or 'dont_know'
   # Outputs:  
   #   Proportion of alters who speak to the ego at the specified frequency
-  ##########
+  # # # # # # # #
   
   # Map frequency labels to numeric codes
   frequency_map <- c(
@@ -1123,7 +1125,7 @@ weak_freq_prop
 ########################## Duration of Relationship ###########################
 
 calc_prop_alters_known_length <- function(persnet_row, time_category) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who have known the ego  
   #           for a specified length of time.
   # Inputs:  
@@ -1132,7 +1134,7 @@ calc_prop_alters_known_length <- function(persnet_row, time_category) {
   #                   'more_than_6years', or 'unknown'
   # Outputs:  
   #   Proportion of alters within the specified time category
-  ##########
+  # # # # # # # #
   
   # Map time categories to numeric codes
   time_map <- c(
@@ -1180,7 +1182,7 @@ weak_dur_prop
 ############################ Distance from Alter ##############################
 
 calc_prop_alters_distance_away <- function(persnet_row, distance_category) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who live within a specified  
   #           distance category from the ego.
   # Inputs:  
@@ -1189,7 +1191,7 @@ calc_prop_alters_distance_away <- function(persnet_row, distance_category) {
   #                       '16_50miles', or 'more50miles'
   # Outputs:  
   #   Proportion of alters within the specified distance category
-  ##########
+  # # # # # # # #
   
   # Map distance categories to numeric codes
   distance_map <- c(
@@ -1238,7 +1240,7 @@ far_dist_prop
 ############################## Alters' Alcohol #################################
 
 prop_heavy_drinkers_row <- function(persnet_row) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who are 'heavy drinkers', defined
   # as those that alters say have or have not count down on drinking in the past
   # six months
@@ -1247,7 +1249,7 @@ prop_heavy_drinkers_row <- function(persnet_row) {
   # Outputs:  
   #   Proportion of alters ego states have or have not cut down on drinking. those 
   # who do not drink heavily or do not drink are considered 'not heavy drinkers'
-  ##########
+  # # # # # # # #
   alcohol_cols_string <- grep("^name\\d+alcohol$", colnames(persnet_row), value = TRUE)
   if (length(alcohol_cols_string) == 0) {
     warning("Error: cannot find variables related to whether alters drink alcohol regularly. Returning NA")
@@ -1268,13 +1270,13 @@ heavy_drinkers_prop
 ############################## Alters' Smoking #################################
 
 calc_prop_alters_smoke <- function(persnet_row) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who do smoke  
   # Inputs:  
   #   persnet_row = A single row of a personal network data frame
   # Outputs:  
   #   Proportion of alters for whom alter answered 1 or 0 to smoking questions
-  ##########
+  # # # # # # # #
   
   # Identify smoking-related columns
   smoke_cols_string <- grep("^name\\d+smoke$", colnames(persnet_row), value = TRUE)
@@ -1301,13 +1303,13 @@ smoking_prop
 ############################ Alters' Exercise ##################################
 
 calc_prop_alters_exercise <- function(persnet_row) {
-  ##########
+  # # # # # # # #
   # Function: Computes the proportion of alters who do not exercise regularly  
   # Inputs:  
   #   persnet_row = A single row of a personal network data frame
   # Outputs:  
   #   Proportion of alters who do not exercise regularly
-  ##########
+  # # # # # # # #
   
   # Identify exercise-related columns
   exer_cols_string <- grep("^name\\d+exer$", colnames(persnet_row), value = TRUE)
@@ -1584,12 +1586,12 @@ graph_scale <- 4
 ## for ~100 networks, we recommend 8.5, 11, and 2
 
 plot_single_network <- function(tidygra, edge_size = 0.5, node_size = 2) {
-  ##########
+  # # # # # # # #
   # Function: Plots a personal network graph using ggraph, distinguishing 
   #           between strong and weak ties and highlighting the ego node.
   # Inputs: tidygra = A tidygraph object representing a personal network
   # Outputs: A ggplot object visualizing the network structure
-  ##########
+  # # # # # # # #
   
   # Test if valid tidygra input
   if (is.null(tidygra) || !"tbl_graph" %in% class(tidygra)) {
