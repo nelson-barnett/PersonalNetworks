@@ -1,21 +1,37 @@
-CODEBOOK FOR PERSONAL NETWORKS
+CODEBOOK FOR PERSONAL NETWORKS ANALYSIS (PERSNET)
 
 
 
 Project contact person: Amar Dhand, adhand@bwh.harvard.edu
 
+Last Update: June 8, 2025
 
-
-Project description: This is R code to process data from REDCap form on personal networks for clinical research. It includes code to create a data table of network metrics and code to create visualizations. This is a supplement of forthcoming paper by Dhand et al. titled ÒA Scalable Online Tool for Quantitative Social Network Assessment Reveals Potentially Modifiable Social Environmental RisksÓ in Nature Communications. 
-
-
+Project description: This is R code to process data from REDCap form on personal networks for clinical research.
 
 Instrument: ÒPersonal network survey for clinical researchÓ is a form available in the REDCap Shared Library.
 
+------------------------------------------------------------------------------------------
+
+Associated Files: 
+
+fake_data.csv   - Fake data provided to represent expected output and allow for testing.
+
+process_persnet.R              - Primary code: data processing and visualization of instrument.
+
+------------------------------------------------------------------------------------------
+
+Output Files:
+
+Clean_Data.csv           - Processed statistics and demographic data for both the ego and alters of social networks.
+
+Single_Networks.pdf      - Visualization of social networks; a series of pages featuring networks display alter names and strength of ties for easy visualization of individual networks.
+
+Social_Network_Grid.pdf  - Visualization of social networks; networks are simplified and displayed as a grid of graphs for easy visualization  of the entire data set.
+
+------------------------------------------------------------------------------------------
 
 
-
-Variable List
+Expected Variable List for Clean_Data.csv:
 
 
 
@@ -41,9 +57,9 @@ Variable name: sex
 
 Variable description: Sex
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 0-Female, 1-Male, 2-Other
+Category values description: 1-Female, 2-Male, 3-Other
 
 Missing data: Coded as Na
 
@@ -53,9 +69,9 @@ Variable name: race1
 
 Variable description: First race 
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Black or African American, 2- White, 3-American Indian/ Alaska Native, 4- Asian, 5- Native Hawaiian or Other Pacific Islander, 77- Other, 88- Unknown
+Category values description: 1- Black or African American, 2- White, 3-American Indian, 4- Asian, 5- Hawaiian and Pacific Islander, 6- Other
 
 Missing data: Coded as Na
 
@@ -65,9 +81,9 @@ Variable name: race2
 
 Variable description: Second race
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Black or African American, 2- White, 3-American Indian/ Alaska Native, 4- Asian, 5- Native Hawaiian or Other Pacific Islander, 77- Other, 88- Unknown
+Category values description: 1- Black or African American, 2- White, 3-American Indian, 4- Asian, 5- Hawaiian and Pacific Islander, 6- Other
 
 Missing data: Coded as Na
 
@@ -77,9 +93,9 @@ Variable name: edu
 
 Variable description: Education level
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- High school or less, 2- High school grad, 3- Some collage, 4- Associate degree, 5- BachelorÕs degree, 6- Graduate degree, 88- Prefer not to answer
+Category values description: 1- Some High School, 2- High School Grad, 3- Some College, 4- Associate Degree, 5- Bachelor's Degree, 6- Graduate Degree, 7- No Answer
 
 Missing data: Coded as Na
 
@@ -89,7 +105,7 @@ Variable name: zip
 
 Variable description: Your ZIP code  
 
-Variable type: Integer
+Variable type: Character (integers stored as character to preserve leading 0's)
 
 Missing data: Coded as Na
 
@@ -99,9 +115,9 @@ Variable name: employment
 
 Variable description: Employment status 
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Employed for wages, 2- Self-employed, 3-Out of work and looking for work, 0- out of work but not currently looking for work, 4- Student, 5- Retired, 6- Unable to work, 7- Prefer not to answer
+Category values description: 1- Employed for wages, 2- Self-employed, 3-Out of work and looking for work, 4- Student, 5- Retired, 6- Unable to work, 7- Prefer not to answer, 8- out of work but not currently looking for work
 
 Missing data: Coded as Na
 
@@ -111,11 +127,9 @@ Variable name: occupation
 
 Variable description: Current occupation  
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Executive manager, 2-Sales or clerical worker, 3- Mechanic/electrician/skilled worker, 4- Machine operator/inspector/ bus or cap driver, 5- service worker (e.g. janitor/ guard), 6- Professional (e.g. nurse/lawyer/teacher or etc), 7- Business owner, 8- Labor / unskilled worker, 9- Farming, 10- Military, 11- Other
-
-Missing data: Coded as Na
+Category values description: 1- Executive manager, 2-Sales or clerical worker, 3- Mechanic, electrician, skilled worker, 4- Machine operator, inspector, bus/cab driver, 5- Service worker, 6- Professional, 7- Business owner, 8- Laborer, unskilled worker, 9- Farming, 10- Military, 11- Other
 
 
 
@@ -123,7 +137,7 @@ Variable name: income
 
 Variable description: What is your approximate household net worth?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
 Category values description: 1- Less than $5,000, 2- $5,000 to $49,000, 3- $50,000 to $169,000, 4- $170,000 to $499,000, 5- More than $500,000
 
@@ -135,9 +149,9 @@ Variable name: married
 
 Variable description: Marital status
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 0- Not Married, 1- Married
+Category values description: 1- Not Married, 2- Married
 
 Missing data: Coded as Na
 
@@ -147,9 +161,9 @@ Variable name: live_alone
 
 Variable description: Do you live alone?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 0- No, 1- yes
+Category values description: 1- No, 2- yes
 
 Missing data: Coded as Na
 
@@ -164,97 +178,96 @@ Missing data: Coded as Na
 
 
 
-Variable name: alcohol
+Variable name: ego_alcohol
 
 Variable description: Have you cut back on heavy drinking of alcohol in the past 3 months?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Yes, 0- No, 9- I donÕt drink heavily
+Category values description: 1- No, 2- Yes, 3- I do not drink heavily
 
 Missing data: Coded as Na
 
 
 
-Variable name: smoke
+Variable name: ego_smoke
 
 Variable description: Have you cut back on smoking in the past 3 months?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Yes, 0- No, 9- I donÕt smoke
+Category values description: 1- No, 2- Yes, 3- I do not smoke
 
 Missing data: Coded as Na
 
 
 
-Variable name: exercise 
+Variable name: ego_exercise 
 
 Variable description: Have you exercised at least 3-4 times a week over the past 3 months?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Yes, 0- No
+Category values description: 1- No, 2- Yes
 
 Missing data: Coded as Na
 
 
 
-Variable name: healthy_diet 
+Variable name: ego_healthy_diet 
 
 Variable description: Did you eat a healthy diet regularly over the past 3 months?
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- Yes, 0- No
-
-Missing data: Coded as Na
-
-
-
-Variable name: health_problem1
-
-Variable description: In which areas do you feel you experience more health problems than the average person? (Select all that apply)
-
-Variable type: Categorical variable
-
-Category values description: 1- General health, 2- Pain, 3- Cognitive/ Mental health, 4-Cardiac, 0- No health problems
+Category values description: 1- No, 2- Yes
 
 Missing data: Coded as Na
 
 
 
-Variable name: health_problem2
+Variable name: health_problems1
 
 Variable description: In which areas do you feel you experience more health problems than the average person? (Select all that apply)
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- General health, 2- Pain, 3- Cognitive/ Mental health, 4-Cardiac, 0- No health problems
+Category values description: 1- General, 2- Pain, 3- Cognitive_MentalHealth, 4- Cardiac, 5- NoProblems
+
+Missing data: Coded as Na
+
+
+Variable name: health_problems2
+
+Variable description: In which areas do you feel you experience more health problems than the average person? (Select all that apply)
+
+Variable type: Categorical variable, Factor
+
+Category values description: 1- General, 2- Pain, 3- Cognitive_MentalHealth, 4- Cardiac, 5- NoProblems
 
 Missing data: Coded as Na
 
 
 
-Variable name: health_problem3
+Variable name: health_problems3
 
 Variable description: In which areas do you feel you experience more health problems than the average person? (Select all that apply)
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- General health, 2- Pain, 3- Cognitive/ Mental health, 4-Cardiac, 0- No health problems
+Category values description: 1- General, 2- Pain, 3- Cognitive_MentalHealth, 4- Cardiac, 5- NoProblems
 
 Missing data: Coded as Na
 
 
 
-Variable name: health_problem4
+Variable name: health_problems4
 
 Variable description: In which areas do you feel you experience more health problems than the average person? (Select all that apply)
 
-Variable type: Categorical variable
+Variable type: Categorical variable, Factor
 
-Category values description: 1- General health, 2- Pain, 3- Cognitive/ Mental health, 4-Cardiac, 0- No health problems
+Category values description: 1- General, 2- Pain, 3- Cognitive_MentalHealth, 4- Cardiac, 5- NoProblems
 
 Missing data: Coded as Na
 
@@ -334,27 +347,37 @@ Variable name: age_sd
 
 Variable description: Standard deviation of network memberÕs age
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
 
 
-Variable name: IQVsex
+Variable name: IQV_sex
 
-Variable description: Index of qualitative variation of sex, higher number meaning balance of men and women in network.
+Variable description: A normalized measure of the heterogeneity of sex within the network's alters, scale from 0 - 1 where 0 is a perfectly homogeneous network and 1 is a perfectly heterogeneous network.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
 
 
-Variable name: IQVrace
+Variable name: IQV_race
 
-Variable description: Index of qualitative variation of race, higher number meaning balance of race in network
-.
-Variable type: integer
+Variable description: A normalized measure of the heterogeneity of racial groups within the network's alters, scale from 0 - 1 where 0 is a perfectly homogeneous network and 1 is a perfectly heterogeneous network.
+
+Variable type: numeric
+
+Missing data: Coded as Na
+
+
+
+Variable name: IQV_educ
+
+Variable description: A normalized measure of the heterogeneity of levels of education within the network's alters, scale from 0 - 1 where 0 is a perfectly homogeneous network and 1 is a perfectly heterogeneous network.
+
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -364,7 +387,7 @@ Variable name: weak_freq_prop
 
 Variable description: Proportion of network members who contact ego monthly or less often.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -374,7 +397,7 @@ Variable name: weak_dur_prop
 
 Variable description: Proportion of network members who have known the ego for less than 6 years.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -384,17 +407,17 @@ Variable name: far_dist_prop
 
 Variable description: Proportion of network members who live >15 miles away.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
 
 
-Variable name: drinking_prop
+Variable name: heavy_drinkers_prop
 
 Variable description: Proportion of network members who are heavy drinkers. Proportion consists of "yes" and "no" answers. Proportion does not include "does not drink" and "unknown" answers.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -404,7 +427,7 @@ Variable name: smoking_prop
 
 Variable description: Proportion of network members who smoke. Proportion consists of "yes" and "no" answers. Proportion does not include "does not smoke" and "unknown" answers.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -414,7 +437,7 @@ Variable name: no_exercise_prop
 
 Variable description: Proportion of network who do not exercise 3-4 times/week.
 
-Variable type: integer
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -423,7 +446,8 @@ Missing data: Coded as Na
 Variable name: bad_diet_prop
 
 Variable description: Proportion of network who have an unhealthy diet.
-Variable type: integer
+
+Variable type: numeric
 
 Missing data: Coded as Na
 
@@ -432,9 +456,57 @@ Missing data: Coded as Na
 Variable name: health_prob_prop
 
 Variable description: Proportion of network who have general, pain, cognitive/mental health, or cardiac health problems.
-Variable type: integer
+
+Variable type: numeric
 
 Missing data: Coded as Na
 
 
 
+Variable name: blau_gender
+
+Variable description: A non-normalized measure of the heterogeneity of gender identity within the network's alters.
+
+Variable type: numeric
+
+Missing data: Coded as Na
+
+
+
+Variable name: blau_educ
+
+Variable description: A non-normalized measure of the heterogeneity of levels of education within the network's alters.
+
+Variable type: numeric
+
+Missing data: Coded as Na
+
+
+
+Variable name: blau_distance
+
+Variable description: A non-normalized measure of the heterogeneity of distance from alters to the ego within the network's alters.
+
+Variable type: numeric
+
+Missing data: Coded as Na
+
+
+
+Variable name: blau_length
+
+Variable description: A non-normalized measure of the heterogeneity of duration of relationship within the network's alters.
+
+Variable type: numeric
+
+Missing data: Coded as Na
+
+
+
+Variable name: blau_speak
+
+Variable description: A non-normalized measure of the heterogeneity of frequency of interaction within the network's alters.
+
+Variable type: numeric
+
+Missing data: Coded as Na
