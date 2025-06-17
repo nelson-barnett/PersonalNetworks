@@ -57,13 +57,12 @@ setwd(dirname(getActiveDocumentContext()$path))
 source("funcs.R")
 
 
-
 ######################### ANALYSIS ##############################
 #Importing data
 df_input <- read.csv(
-  data_file,
-  stringsAsFactors = FALSE,
-  colClasses = c(zip = "character")
+    data_file,
+    stringsAsFactors = FALSE,
+    colClasses = c(zip = "character")
 ) #this reads in zip retains 0s
 
 df_dict <- read.csv(dict_file)
@@ -166,19 +165,18 @@ iqv_educ <- purrr::map_dbl(
 relat_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1relat"))
 kin_prop <- purrr::map_dbl(
     1:nrow(df_input),
-    ~ sum_prop_alters(
+    ~ calc_prop_alters_multians(
         df_input[.x, , drop = FALSE],
         c("Spouse", "Family"),
         relat_map,
-        "relat",
-        TRUE
+        "relat"
     )
 )
 
 speak_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1speak"))
 weak_freq_prop <- purrr::map_dbl(
     1:nrow(df_input),
-    ~ sum_prop_alters(
+    ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("Monthly", "Less often"),
         speak_map,
@@ -189,18 +187,18 @@ weak_freq_prop <- purrr::map_dbl(
 len_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1length"))
 weak_dur_prop <- purrr::map_dbl(
     1:nrow(df_input),
-    ~ sum_prop_alters(
+    ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("Less than three", "Three to six"),
         len_map,
-        "length",
+        "length"
     )
 )
 
 dist_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1dist"))
 far_dist_prop <- purrr::map_dbl(
     1:nrow(df_input),
-    ~ sum_prop_alters(
+    ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("16-50 miles", "50+ miles"),
         len_map,
@@ -211,7 +209,7 @@ far_dist_prop <- purrr::map_dbl(
 als_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1als"))
 met_through_als_prop <- purrr::map_dbl(
     1:nrow(df_input),
-    ~ sum_prop_alters(
+    ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("Yes"),
         als_map,
@@ -349,12 +347,13 @@ df_clean = tibble::tibble(
 df_clean$zip <- as.character(df_clean$zip) #double check zip as string
 
 ######################### FIGURES ##############################
-list_tidygras <- organize_list_tidygraphs(df_input)
+df_relat_names <- names_to_relat(df_input, relat_map)
+list_tidygras <- organize_list_tidygraphs(df_relat_names)
 list_network_plots_labels <- mapply(
-  plot_single_network_node_labels,
-  tidygra=list_tidygras,
-  ego_name=record_id,
-  SIMPLIFY = FALSE
+    plot_single_network_node_labels,
+    tidygra = list_tidygras,
+    ego_name = record_id,
+    SIMPLIFY = FALSE
 )
 
 #Width in inches of the output PDF

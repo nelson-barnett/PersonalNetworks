@@ -3,7 +3,7 @@ get_codebook_mapping <- function(df, field_name) {
     this_row <- dplyr::filter(df, Variable...Field.Name == field_name)
 
     # Handle yes/no questions. REDCap standard is no=0, yes=1
-    if (purrr::is_empty(this_row$Field.Type)){
+    if (purrr::is_empty(this_row$Field.Type)) {
         stop(sprintf("Cannot find field_name `%s` in df", field_name))
     } else if (this_row$Field.Type == "yesno") {
         lvls <- c(0, 1)
@@ -24,9 +24,68 @@ get_codebook_mapping <- function(df, field_name) {
     return(list(levels = lvls, labels = lbls))
 }
 
-codebook_to_dict <- function(l){
+codebook_to_dict <- function(l) {
     names(l$levels) <- l$labels
     return(l$levels)
+}
+
+n_alters <- function(persnet_row) {
+    return(sum(
+        persnet_row %>% dplyr::select(tie1:tie15) != 0,
+        na.rm = TRUE
+    ))
+}
+
+names_to_relat <- function(df, mapping) {
+    F <- function(persnet_row) {
+        # Go through each "nameNUM" column
+        for (i in 1:15) {
+            # Find corresponding nameNUMrelat___NUM columns
+            relat_cols <- dplyr::select(
+                persnet_row,
+                dplyr::matches(sprintf("^name%srelat_*\\d+$", i))
+            )
+            if (!any(relat_cols)) {
+                next
+            }
+            # Take the first one that == 1
+            label <- names(mapping)[
+                mapping ==
+                    sub(".*_", "", names(relat_cols[which(relat_cols == 1)][1]))
+            ]
+
+            # Check if label exists
+            col_with_label <- grep(sprintf("^%s$", label), persnet_row)
+            # If label exists, add a 1 suffix to it
+            if (!length(col_with_label) == 0L) {
+                persnet_row[[col_with_label]] <- sprintf("%s_1", label)
+            }
+
+            # If there are already numbered labels, make one with a unique suffix
+            if (length(grep(sprintf("^%s_", label), persnet_row)) > 0L) {
+                # Loop until new_name has a unique suffix
+                suffix <- 2
+                new_name <- sprintf("%s_%s", label, suffix)
+                while (
+                    new_name %in%
+                        dplyr::select(persnet_row, c(sprintf("name%s", 1:15)))
+                ) {
+                    suffix <- suffix + 1
+                    new_name <- sprintf("%s_%s", label, suffix)
+                }
+            } else {
+                # This is first time seeing this label, so make that the name
+                new_name <- label
+            }
+
+            # Replace the value of this name
+            persnet_row[[sprintf("name%s", i)]] <- new_name
+        }
+        return(persnet_row)
+    }
+
+    # Apply the function to each row of df and reconstruct the table
+    return(df %>% rowwise() %>% summarize(F(across())))
 }
 
 remove_ego_from_igraph <- function(tg_graph) {
@@ -71,8 +130,9 @@ organize_row_to_tidygraph <- function(df_row_input) {
 
     # Extract column names for alters from the input row
     psn_name_cols <- dplyr::select(
-        df_row_input, c(sprintf("name%s",1:15))
-        )
+        df_row_input,
+        c(sprintf("name%s", 1:15))
+    )
 
     # Determine which alters to keep based on a "keep" column (binary indicator)
     psn_keep_name_cols <- dplyr::select(df_row_input, name_1:name_15)
@@ -145,7 +205,7 @@ organize_list_tidygraphs <- function(persnet_df) {
 }
 
 
-################################ Race #########################################
+################################ Stats #########################################
 
 extract_attribute <- function(
     persnet_row,
@@ -169,11 +229,6 @@ extract_attribute <- function(
         return(selected_cols[number])
     }
 }
-
-
-######################## Network Structure Measures ###########################
-
-###################### Total Network Size (Unique Alters) #####################
 
 calc_total_alters_row <- function(persnet_row) {
     ########## NOTE: This has more_names column too, which doesn't align with the graphed network
@@ -536,12 +591,10 @@ sd_age_alters_row <- function(persnet_row) {
 
 ####################### Diversity Calculation Functions #######################
 
-
 calc_blau_alter_heterophily <- function(
     persnet_row,
     attribute,
-    mapping,
-    multi_ans = FALSE
+    mapping
 ) {
     # # # # # # # #
     # Function: Computes the Blau heterophily index for a specified alter attribute.
@@ -562,12 +615,11 @@ calc_blau_alter_heterophily <- function(
     # Apply calc_prop_alters to all "keys" in mapping, returning a list, then get the proportion
     return(
         lapply(names(mapping), function(x) {
-            calc_prop_alters(
+            calc_prop_alters_singleans(
                 persnet_row,
                 x,
                 mapping,
-                attribute,
-                multi_ans
+                attribute
             )^2
         }) %>%
             unlist() %>%
@@ -582,8 +634,7 @@ calc_blau_alter_heterophily <- function(
 calc_attribute_iqv <- function(
     persnet_row,
     attribute,
-    mapping,
-    multi_ans = FALSE
+    mapping
 ) {
     # # # # # # # #
     # Function: Computes the Index of Qualitative Variation (IQV) for a specified
@@ -602,29 +653,68 @@ calc_attribute_iqv <- function(
         calc_blau_alter_heterophily(
             persnet_row,
             attribute,
-            mapping,
-            multi_ans
+            mapping
         ) /
             1 -
             (1 / length(mapping[[1]])),
-        2
+        digits = 2
     ))
+}
+
+calc_prop_alters_multians <- function(
+    persnet_row,
+    categories,
+    mapping,
+    keyword
+) {
+    # Validate the category input
+    if (!all((categories %in% names(mapping)))) {
+        stop(sprintf(
+            "Error: categories `%s` is not in the provided mapping. Must be in: %s",
+            paste(categories, collapse = "`, `"),
+            paste(names(mapping), collapse = ", ")
+        ))
+    }
+
+    # Convert row to a tidygraph object and check if the network is an isolate
+    if (igraph::vcount(organize_row_to_tidygraph(persnet_row)) == 1) {
+        return(NA)
+    }
+
+    # Find all columns pertaining to everything in categories
+    relevant_cols <- purrr::map(categories, function(x) {
+        persnet_row %>%
+            dplyr::select(dplyr::matches(sprintf(
+                "^name%s%s_*%s$",
+                1:15,
+                keyword,
+                mapping[[x]]
+            )))
+    }) %>%
+        unlist()
+
+    # How many unique names == 1 (avoids double counting categories)
+    return(
+        length(
+            gsub("_(.*)", "", names(which(relevant_cols == 1))) %>% unique()
+        ) /
+            n_alters(persnet_row)
+    )
 }
 
 
 ############ main prop func
-calc_prop_alters <- function(
+calc_prop_alters_singleans <- function(
     persnet_row,
-    category,
+    categories,
     mapping,
-    keyword,
-    multi_ans = FALSE # Checkbox style quesions as nameNUM___VAL
+    keyword
 ) {
     # Validate the category input
-    if (!(category %in% names(mapping))) {
+    if (!all((categories %in% names(mapping)))) {
         stop(sprintf(
-            "Error: category `%s` is not in the provided mapping. Must be in: %s",
-            category,
+            "Error: categories `%s` is not in the provided mapping. Must be in: %s",
+            paste(categories, collapse = "`, `"),
             paste(names(mapping), collapse = ", ")
         ))
     }
@@ -635,63 +725,23 @@ calc_prop_alters <- function(
     }
 
     # Select keyword columns of the proper form
-    if (multi_ans) {
-        selected_cols <- persnet_row %>%
-            dplyr::select(dplyr::matches(sprintf(
-                "^name%s%s_*%s$",
-                1:15,
-                keyword,
-                mapping[[category]]
-            )))
-    } else {
-        selected_cols <- persnet_row %>%
-            dplyr::select(matches(c(sprintf("^name%s%s$", 1:15, keyword))))
-    }
+    selected_cols <- persnet_row %>%
+        dplyr::select(matches(c(sprintf("^name%s%s$", 1:15, keyword))))
 
     # Calculate and return the proportion of alters within the specified category
     if (dim(selected_cols)[2] == 0) {
-        if (multi_ans) {
-            return(0)
-        } else {
-            stop(sprintf("Error: Cannot find columns related to `%s`.", keyword))
-        }
-    } else if (multi_ans) {
-        return(
-            length(which(selected_cols == 1)) /
-                sum(
-                    persnet_row %>% dplyr::select(tie1:tie15) != 0,
-                    na.rm = TRUE
-                )
-        )
+        warning(sprintf(
+            "Error: Cannot find columns related to `%s`. Returning NA...",
+            keyword
+        ))
+        return(NA)
     } else {
         return(
-            length(which(selected_cols %in% mapping[[category]])) /
-                sum(
-                    persnet_row %>% dplyr::select(tie1:tie15) != 0,
-                    na.rm = TRUE
-                )
+            length(which(selected_cols %in% mapping[categories])) /
+                n_alters(persnet_row)
         )
     }
 }
-
-sum_prop_alters <- function(
-    persnet_row,
-    categories,
-    mapping,
-    keyword,
-    multi_ans = FALSE
-) {
-    return(
-        lapply(categories, function(category) {
-            calc_prop_alters(persnet_row, category, mapping, keyword, multi_ans)
-        }) %>%
-            unlist() %>%
-            sum() %>%
-            round(digits = 2)
-    )
-}
-
-
 
 #this command applies the function "calc_attribute_iqv" to each row of
 ##df_input (the .x is the index), drop=FALSE forces R to return a dataframe
