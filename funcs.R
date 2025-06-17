@@ -1,5 +1,6 @@
-### Get labels and values from redcap codebook export
+################################ Helper Functions #########################################
 get_codebook_mapping <- function(df, field_name) {
+    ### Get labels and values from redcap codebook export
     this_row <- dplyr::filter(df, Variable...Field.Name == field_name)
 
     # Handle yes/no questions. REDCap standard is no=0, yes=1
@@ -37,6 +38,7 @@ n_alters <- function(persnet_row) {
 }
 
 names_to_relat <- function(df, mapping) {
+    # Returns a new dataframe with the names replaced by unique relationship labels
     F <- function(persnet_row) {
         # Go through each "nameNUM" column
         for (i in 1:15) {
@@ -702,8 +704,6 @@ calc_prop_alters_multians <- function(
     )
 }
 
-
-############ main prop func
 calc_prop_alters_singleans <- function(
     persnet_row,
     categories,
@@ -743,202 +743,6 @@ calc_prop_alters_singleans <- function(
     }
 }
 
-#this command applies the function "calc_attribute_iqv" to each row of
-##df_input (the .x is the index), drop=FALSE forces R to return a dataframe
-#rather than vector
-# IQV is essentially a normalized version of Blau's heterogenity index, and hence
-#the IQV function relies on the blau alter heterophily
-# Both of these can be tweaked for specific variable names
-
-############################## Alters' Alcohol #################################
-
-prop_heavy_drinkers_row <- function(persnet_row) {
-    # # # # # # # #
-    # Function: Computes the proportion of alters who are 'heavy drinkers', defined
-    # as those that alters say have or have not count down on drinking in the past
-    # six months
-    # Inputs:
-    #   persnet_row       = A single row of a personal network data frame
-    # Outputs:
-    #   Proportion of alters ego states have or have not cut down on drinking. those
-    # who do not drink heavily or do not drink are considered 'not heavy drinkers'
-    # # # # # # # #
-    alcohol_cols_string <- grep(
-        "^name\\d+alcohol$",
-        colnames(persnet_row),
-        value = TRUE
-    )
-    if (length(alcohol_cols_string) == 0) {
-        warning(
-            "Error: cannot find variables related to whether alters drink alcohol regularly. Returning NA"
-        )
-        return(NA)
-    } else {
-        alcohol_cols <- persnet_row %>%
-            dplyr::select(name1alcohol:name15alcohol)
-        return(
-            round(
-                (length(which(alcohol_cols == 0)) +
-                    length(which(alcohol_cols == 1))) /
-                    sum(
-                        persnet_row %>% dplyr::select(tie1:tie15) != 0,
-                        na.rm = TRUE
-                    ),
-                2
-            )
-        )
-    }
-}
-
-
-############################## Alters' Smoking #################################
-
-calc_prop_alters_smoke <- function(persnet_row) {
-    # # # # # # # #
-    # Function: Computes the proportion of alters who do smoke
-    # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    # Outputs:
-    #   Proportion of alters for whom alter answered 1 or 0 to smoking questions
-    # # # # # # # #
-
-    # Identify smoking-related columns
-    smoke_cols_string <- grep(
-        "^name\\d+smoke$",
-        colnames(persnet_row),
-        value = TRUE
-    )
-
-    # Test if any of smoking columns are missing
-    if (length(smoke_cols_string) == 0) {
-        warning("Error: Cannot find variables related to whether alters smoke.")
-        return(NA)
-    }
-
-    # Select smoking-related columns
-    smoke_cols <- persnet_row %>% dplyr::select(name1smoke:name15smoke)
-
-    # Calculate and return the proportion of alters who do smoke
-    prop_smoke_value <- sum(
-        length(which(smoke_cols == 0)),
-        length(which(smoke_cols == 1))
-    ) /
-        sum(persnet_row %>% dplyr::select(tie1:tie15) != 0, na.rm = TRUE)
-    return(
-        round(prop_smoke_value, 2)
-    )
-}
-
-
-############################ Alters' Exercise ##################################
-
-calc_prop_alters_exercise <- function(persnet_row) {
-    # # # # # # # #
-    # Function: Computes the proportion of alters who do not exercise regularly
-    # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    # Outputs:
-    #   Proportion of alters who do not exercise regularly
-    # # # # # # # #
-
-    # Identify exercise-related columns
-    exer_cols_string <- grep(
-        "^name\\d+exer$",
-        colnames(persnet_row),
-        value = TRUE
-    )
-
-    # Handle missing columns
-    if (length(exer_cols_string) == 0) {
-        stop(
-            "Error: Cannot find variables related to whether alters exercised regularly."
-        )
-    }
-
-    # Select exercise-related columns
-    exer_cols <- persnet_row %>% dplyr::select(name1exer:name15exer)
-
-    # Calculate the proportion of alters who do not exercise regularly
-    return(
-        round(
-            (length(which(exer_cols == 0)) /
-                sum(
-                    persnet_row %>% dplyr::select(tie1:tie15) != 0,
-                    na.rm = TRUE
-                )),
-            2
-        )
-    )
-}
-
-
-############################### Alters' Diet ###################################
-
-calc_prop_alters_diet <- function(persnet_row) {
-    # # # # # #
-    # Function: Computes the proportion of alters who have a bad diet
-    # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    # Outputs:
-    #   Proportion of alters ego knew ``did not eat a healthy diet regularly over the past 3 months'
-    # # # # # #
-
-    # Identify diet-related columns
-    diet_cols_string <- grep(
-        "^name\\d+diet$",
-        colnames(persnet_row),
-        value = TRUE
-    )
-
-    # Handle missing columns
-    if (length(diet_cols_string) == 0) {
-        warning(
-            "Error: Cannot find variables related to whether alters had a good diet."
-        )
-        return(NA)
-    }
-
-    # Select diet-related columns
-    diet_cols <- persnet_row %>% dplyr::select(name1diet:name15diet)
-
-    # Calculate and return the proportion of alters with a good diet
-    diet_prop_value <- length(which(diet_cols == 0)) /
-        sum(persnet_row %>% dplyr::select(tie1:tie15) != 0, na.rm = TRUE)
-
-    return(
-        round(diet_prop_value, 2)
-    )
-}
-
-######################### Alters' Health Problems ##############################
-
-alter_health_problems_row <- function(persnet_row) {
-    alter_health_cols_string <- grep(
-        "^name\\d+health___\\d+$",
-        colnames(persnet_row),
-        value = TRUE
-    )
-    if (length(alter_health_cols_string) == 0) {
-        stop("Error: cannot find variables related to alter health problems.")
-    } else {
-        alter_health_problem_cols <- persnet_row %>%
-            dplyr::select(name1health___1:name15health___99) %>%
-            dplyr::select(!dplyr::contains("___99")) %>%
-            dplyr::select(!dplyr::contains("___0"))
-
-        return(
-            round(
-                sum(alter_health_problem_cols) /
-                    sum(
-                        persnet_row %>% dplyr::select(tie1:tie15) != 0,
-                        na.rm = TRUE
-                    ),
-                2
-            )
-        )
-    }
-}
-
 ##################### Constructing/Exporting Data Frame #######################
 
 ###################### Single Network Visualizations ###########################
@@ -951,7 +755,13 @@ alter_health_problems_row <- function(persnet_row) {
 plot_single_network_node_labels <- function(
     tidygra,
     ego_name = NULL,
-    fig_title = NULL
+    fig_title = NULL,
+    friend_fill = "#89b53c",
+    family_fill = "#007080",
+    friend_txt = "white",
+    family_txt = "white",
+    weak_color = "#236782",
+    strong_color = "#c26c21"
 ) {
     # # # # #
     # Function: Plots a personal network graph using ggraph, distinguishing
@@ -989,9 +799,23 @@ plot_single_network_node_labels <- function(
             strength_of_tie = ifelse(weight == 1, "weak", "strong")
         ) %>%
         tidygraph::activate(nodes) %>%
-        dplyr::mutate(alter_dummy = ifelse(name != 'ego', 1, 0)) %>%
-        dplyr::mutate(node_fill = ifelse(name == "ego", "black", "white")) %>%
-        dplyr::mutate(node_text_color = ifelse(name == "ego", "white", "black"))
+        dplyr::mutate(alter_dummy = ifelse(name != "ego", 1, 0)) %>%
+        dplyr::mutate(
+            node_fill = dplyr::case_when(
+                name == "ego" ~ "black",
+                grepl("^Friend", name) ~ friend_fill,
+                grepl("^Family", name) ~ family_fill,
+                .default = "white"
+            )
+        ) %>%
+        dplyr::mutate(
+            node_text_color = dplyr::case_when(
+                name == "ego" ~ "white",
+                grepl("^Friend", name) ~ friend_txt,
+                grepl("^Family", name) ~ family_txt,
+                .default = "black"
+            )
+        )
 
     record_id <- tidygra %N>% dplyr::pull(record_id) %>% unique() %>% .[1]
     ttl <- ifelse(is.null(fig_title), paste("Record ID:", record_id), fig_title)
@@ -1018,7 +842,7 @@ plot_single_network_node_labels <- function(
                 values = c("weak" = "dashed", "strong" = "solid")
             ) +
             scale_edge_color_manual(
-                values = c("weak" = "#5B8FA8FF", "strong" = "#800000FF")
+                values = c("weak" = weak_color, "strong" = strong_color)
             ) +
             geom_node_point(
                 aes(color = factor(alter_dummy)),
@@ -1051,7 +875,7 @@ plot_single_network_node_labels <- function(
                 values = c("weak" = "dashed", "strong" = "solid")
             ) +
             scale_edge_color_manual(
-                values = c("weak" = "#5B8FA8FF", "strong" = "#800000FF")
+                values = c("weak" = weak_color, "strong" = strong_color)
             ) +
             geom_node_point(size = 4, color = 'grey66', show.legend = FALSE) +
             geom_node_label(
@@ -1072,19 +896,13 @@ plot_single_network_node_labels <- function(
 
 ###################### Network Montage Visualization ##########################
 
-#This section creates a montage of network graphs in a grid orientation from top
-#  left to bottom right. These graphs are purposefully stripped of alter names
-#  and simplified for a better visualization at smaller sizes. Output is a PDF by default.
-
-#Default sizing/scaling for this section is set for the fake datasets of n = 6. You may need to
-#  make adjustments for larger/smaller datasets and differently sized outputs. This section
-#  only needs data import and functions in the "Establishing Network Graph Functions" section to work.
-
-#To customize the montage easily, modify these three variables to create a desired output.
-#  Note that at smaller output sizes and/or larger datasets you may need to reduce the
-#  graph_scale, otherwise the edges/nodes will be too large for their respective graphs.
-
-plot_single_network <- function(tidygra, edge_size = 0.5, node_size = 2) {
+plot_single_network <- function(
+    tidygra,
+    edge_size = 0.5,
+    node_size = 2,
+    weak_color = "#236782",
+    strong_color = "#c26c21"
+) {
     # # # # # # # #
     # Function: Plots a personal network graph using ggraph, distinguishing
     #           between strong and weak ties and highlighting the ego node.
@@ -1140,7 +958,7 @@ plot_single_network <- function(tidygra, edge_size = 0.5, node_size = 2) {
                     values = c("weak" = "solid", "strong" = "solid")
                 ) +
                 scale_edge_colour_manual(
-                    values = c("weak" = "#5B8FA8FF", "strong" = "#800000FF")
+                    values = c("weak" = weak_color, "strong" = strong_color)
                 ) +
                 geom_node_point(
                     aes(color = factor(alter_dummy)),
@@ -1163,7 +981,7 @@ plot_single_network <- function(tidygra, edge_size = 0.5, node_size = 2) {
                     values = c("weak" = "solid", "strong" = "solid")
                 ) +
                 scale_edge_colour_manual(
-                    values = c("weak" = "#5B8FA8FF", "strong" = "#800000FF")
+                    values = c("weak" = weak_color, "strong" = strong_color)
                 ) +
                 geom_node_point(
                     size = node_size,

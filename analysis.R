@@ -356,6 +356,20 @@ list_network_plots_labels <- mapply(
     SIMPLIFY = FALSE
 )
 
+
+#This section creates a montage of network graphs in a grid orientation from top
+#  left to bottom right. These graphs are purposefully stripped of alter names
+#  and simplified for a better visualization at smaller sizes. Output is a PDF by default.
+
+#Default sizing/scaling for this section is set for the fake datasets of n = 6. You may need to
+#  make adjustments for larger/smaller datasets and differently sized outputs. This section
+#  only needs data import and functions in the "Establishing Network Graph Functions" section to work.
+
+#To customize the montage easily, modify these three variables to create a desired output.
+#  Note that at smaller output sizes and/or larger datasets you may need to reduce the
+#  graph_scale, otherwise the edges/nodes will be too large for their respective graphs.
+
+
 #Width in inches of the output PDF
 output_width <- 7.5
 #Height in inches of the output PDF
