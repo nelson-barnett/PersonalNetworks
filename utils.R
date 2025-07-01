@@ -1,11 +1,13 @@
 ##### Helpful utility functions
 
-get_codebook_mapping <- function(df, field_name) {
+get_codebook_mapping <- function(df, field_name, kv_split = ",", options_split = "|") {
     # # # # # # # #
     # Function: Extracts labels and values from redcap codebook
     # Inputs:
     #   df = Dataframe codebook (typically read in via read.csv())
     #   field_name = `Character` the value in the column "Variable / Field Name" from which to extract keys and values
+    #   kv_split = `Character` separating labels from values (such as "," in "1, Daily | 2, Weekly"). Default = ","
+    #   options_split `Character` separating key-value pairs from each other (such as "|" in "1, Daily | 2, Weekly"). Default = "|"
     # Outputs: `named double` with character labels as names and integers as values
     # # # # # # # #
 
@@ -21,9 +23,9 @@ get_codebook_mapping <- function(df, field_name) {
         # REDCap standard is to separate options with | and keys/values with ,
         items_list <- this_row %>%
             dplyr::pull(Choices..Calculations..OR.Slider.Labels) %>%
-            strsplit(, split = "|", fixed = TRUE) %>%
+            strsplit(, split = options_split, fixed = TRUE) %>%
             unlist() %>%
-            strsplit(split = ",", fixed = TRUE) %>%
+            strsplit(split = kv_split, fixed = TRUE) %>%
             lapply(trimws)
 
         # Separate keys and values
