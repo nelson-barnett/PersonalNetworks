@@ -1,94 +1,6 @@
-################################ Helper Functions #########################################
-get_codebook_mapping <- function(df, field_name) {
-    ### Get labels and values from redcap codebook export
-    this_row <- dplyr::filter(df, Variable...Field.Name == field_name)
+##### Functions related to statistics calculations
 
-    # Handle yes/no questions. REDCap standard is no=0, yes=1
-    if (purrr::is_empty(this_row$Field.Type)) {
-        stop(sprintf("Cannot find field_name `%s` in df", field_name))
-    } else if (this_row$Field.Type == "yesno") {
-        lvls <- c(0, 1)
-        lbls <- c("no", "yes")
-    } else {
-        # REDCap standard is to separate options with | and keys/values with ,
-        vals <- this_row %>%
-            dplyr::pull(Choices..Calculations..OR.Slider.Labels) %>%
-            strsplit(, split = "|", fixed = TRUE) %>%
-            unlist() %>%
-            strsplit(split = ",", fixed = TRUE) %>%
-            lapply(trimws)
-
-        # Want to return levels and labels as their own lists
-        lvls <- purrr::map(vals, 1) %>% unlist() %>% as.numeric()
-        lbls <- purrr::map(vals, 2) %>% unlist()
-    }
-    return(list(levels = lvls, labels = lbls))
-}
-
-codebook_to_dict <- function(l) {
-    names(l$levels) <- l$labels
-    return(l$levels)
-}
-
-n_alters <- function(persnet_row) {
-    return(sum(
-        persnet_row %>% dplyr::select(tie1:tie15) != 0,
-        na.rm = TRUE
-    ))
-}
-
-names_to_relat <- function(df, mapping) {
-    # Returns a new dataframe with the names replaced by unique relationship labels
-    F <- function(persnet_row) {
-        # Go through each "nameNUM" column
-        for (i in 1:15) {
-            # Find corresponding nameNUMrelat___NUM columns
-            relat_cols <- dplyr::select(
-                persnet_row,
-                dplyr::matches(sprintf("^name%srelat_*\\d+$", i))
-            )
-            if (!any(relat_cols)) {
-                next
-            }
-            # Take the first one that == 1
-            label <- names(mapping)[
-                mapping ==
-                    sub(".*_", "", names(relat_cols[which(relat_cols == 1)][1]))
-            ]
-
-            # Check if label exists
-            col_with_label <- grep(sprintf("^%s$", label), persnet_row)
-            # If label exists, add a 1 suffix to it
-            if (!length(col_with_label) == 0L) {
-                persnet_row[[col_with_label]] <- sprintf("%s_1", label)
-            }
-
-            # If there are already numbered labels, make one with a unique suffix
-            if (length(grep(sprintf("^%s_", label), persnet_row)) > 0L) {
-                # Loop until new_name has a unique suffix
-                suffix <- 2
-                new_name <- sprintf("%s_%s", label, suffix)
-                while (
-                    new_name %in%
-                        dplyr::select(persnet_row, c(sprintf("name%s", 1:15)))
-                ) {
-                    suffix <- suffix + 1
-                    new_name <- sprintf("%s_%s", label, suffix)
-                }
-            } else {
-                # This is first time seeing this label, so make that the name
-                new_name <- label
-            }
-
-            # Replace the value of this name
-            persnet_row[[sprintf("name%s", i)]] <- new_name
-        }
-        return(persnet_row)
-    }
-
-    # Apply the function to each row of df and reconstruct the table
-    return(df %>% rowwise() %>% summarize(F(across())))
-}
+###################### Utility Functions ######################
 
 remove_ego_from_igraph <- function(tg_graph) {
     # # # # # # # #
@@ -207,29 +119,49 @@ organize_list_tidygraphs <- function(persnet_df) {
 }
 
 
-################################ Stats #########################################
+n_alters <- function(persnet_row) {
+    # # # # # # # #
+    # Function: Counts the number of alters in a network
+    # Inputs: persnet_row = one row of a persnet dataframe
+    # Outputs: `double` the nubmer of alters in the persnet row's network
+    # # # # # # # #
 
-extract_attribute <- function(
+    return(sum(
+        persnet_row %>% dplyr::select(tie1:tie15) != 0,
+        na.rm = TRUE
+    ))
+}
+
+extract_ego_multi_attributes <- function(
     persnet_row,
-    number,
-    labels,
-    attribute
+    attribute,
+    mapping
 ) {
-    # Get race column names
+    # # # # # # #
+    # Function: Extract the labels for all values of the attribute in a checkbox/multi answer style field (e.g. race___1, race___2, etc.)
+    # Inputs:
+    #   persnet_row = A single row of a personal network data frame
+    #   attribute = Character name of attribute in question (e.g. "race")
+    #   mapping = `named double` with labels as names and integers as values
+    # Outputs:
+    #   `Character` containing the labels from mapping for each value in the attribute columns
+    # # # # # # #
+
+    # Get attribute column names
     cols <- grep(
         sprintf("^%s_*\\d+$", attribute),
         names(persnet_row),
         value = TRUE
     )
 
-    # identify which columns are marked as 1
-    selected_cols <- labels[which(persnet_row[cols] == 1)]
-    #select which item in list of race columns == 1
-    if (number > length(selected_cols)) {
-        return(NA)
-    } else {
-        return(selected_cols[number])
-    }
+    # Get NUM in attribute___NUM for all columns where the value == 1, get label from mapping
+    return(
+        mapping[
+            sub(".*_", "", cols[which(persnet_row[cols] == 1)]) %>%
+                as.numeric()
+        ] %>%
+            names()
+    )
 }
 
 calc_total_alters_row <- function(persnet_row) {
@@ -278,10 +210,10 @@ calc_total_alters_row <- function(persnet_row) {
 }
 
 calc_total_alters_df <- function(persnet_df) {
-    #applies total alters row to each dataframe
+    # applies total alters row to each dataframe
     tryCatch(
         {
-            #apply to each row the function of calculate total alters
+            # apply to each row the function of calculate total alters
             vector_count_total_alters <- apply(persnet_df, 1, function(row) {
                 calc_total_alters_row(
                     persnet_df %>% dplyr::filter(record_id == row["record_id"])
@@ -298,6 +230,8 @@ calc_total_alters_df <- function(persnet_df) {
         }
     )
 }
+
+############################ Metric Functions ###################################
 
 ########################### Network Density ###################################
 
@@ -603,18 +537,15 @@ calc_blau_alter_heterophily <- function(
     #           The index measures diversity within a personal network.
     # Inputs:
     #   persnet_row = A single row of a personal network data frame
-    #   attribute   = One of 'gender', 'race', 'educ', 'support' (types of support),
-    #                 'distance' (how far alters live from ego), 'length'
-    #                 (how long alters have known ego), or 'speak'
-    #                 (how often alters speak to ego)
+    #   attribute   = `Character` attribute on which to calculate metric
+    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
     # Outputs:
     #   Blau heterophily index for the specified attribute
     # # # # # # # #
 
-    # Blau heterophily assumes mutually exclusive categories,
-    # but alters can be in multiple relationships and offer multiple types of support.
+    # Blau heterophily assumes mutually exclusive categories, so only use 'singleans'
 
-    # Apply calc_prop_alters to all "keys" in mapping, returning a list, then get the proportion
+    # Apply calc_prop_alters_singleans to all names in mapping, returning a list, then get the proportion
     return(
         lapply(names(mapping), function(x) {
             calc_prop_alters_singleans(
@@ -644,8 +575,8 @@ calc_attribute_iqv <- function(
     #           a personal network.
     # Inputs:
     #   persnet_row = A single row of a personal network data frame
-    #   attribute   = One of 'gender', 'educ', 'relationships' (family vs non-family),
-    #                 or 'support' (types of support)
+    #   attribute   = `Character` attribute on which to calculate metric
+    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
     # Outputs:
     #   IQV value for the specified attribute
     # # # # # # # #
@@ -667,8 +598,23 @@ calc_prop_alters_multians <- function(
     persnet_row,
     categories,
     mapping,
-    keyword
+    attribute
 ) {
+    # # # # # # # #
+    # Function: Computes the proportion of alters that have a given category or categories
+    #   for attributes that may have multiple answers (such as "relationship").
+    #   Does not double count in the case where one alter is assigned multiple values in `categories`.
+    #
+    # Inputs:
+    #   persnet_row = A single row of a personal network data frame
+    #   categories  = `Character` containing one or multiple categories from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
+    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   attribute   = `Character` attribute in which categories can be found (e.g. "relat")
+    # Outputs:
+    #   `double` Proportion of alters that have the category/one of the categories in `categories`.
+    #   Returns NA if cannot find columns related to `attribute`
+    # # # # # # # #
+
     # Validate the category input
     if (!all((categories %in% names(mapping)))) {
         stop(sprintf(
@@ -689,27 +635,49 @@ calc_prop_alters_multians <- function(
             dplyr::select(dplyr::matches(sprintf(
                 "^name%s%s_*%s$",
                 1:15,
-                keyword,
+                attribute,
                 mapping[[x]]
             )))
     }) %>%
         unlist()
 
     # How many unique names == 1 (avoids double counting categories)
-    return(
-        length(
-            gsub("_(.*)", "", names(which(relevant_cols == 1))) %>% unique()
-        ) /
-            n_alters(persnet_row)
-    )
+    if (is.null(relevant_cols)) {
+        warning(sprintf(
+            "Cannot find columns related to `%s`. Returning NA...",
+            attribute
+        ))
+        return(NA)
+    } else {
+        return(
+            length(
+                gsub("_(.*)", "", names(which(relevant_cols == 1))) %>% unique()
+            ) /
+                n_alters(persnet_row)
+        )
+    }
 }
 
 calc_prop_alters_singleans <- function(
     persnet_row,
     categories,
     mapping,
-    keyword
+    attribute
 ) {
+    # # # # # # # #
+    # Function: Computes the proportion of alters that have a given category or categories
+    #   for attributes that may have only have one answer (such as "speak" and "length").
+    #
+    # Inputs:
+    #   persnet_row = A single row of a personal network data frame
+    #   categories  = `Character` containing one or multiple categories from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
+    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   attribute   = `Character` attribute in which categories can be found (e.g. "relat")
+    # Outputs:
+    #   `double` Proportion of alters that have the category/one of the categories in `categories`.
+    #   Returns NA if cannot find columns related to `attribute`
+    # # # # # # # #
+
     # Validate the category input
     if (!all((categories %in% names(mapping)))) {
         stop(sprintf(
@@ -724,15 +692,15 @@ calc_prop_alters_singleans <- function(
         return(NA)
     }
 
-    # Select keyword columns of the proper form
+    # Select attribute columns of the proper form
     selected_cols <- persnet_row %>%
-        dplyr::select(matches(c(sprintf("^name%s%s$", 1:15, keyword))))
+        dplyr::select(matches(c(sprintf("^name%s%s$", 1:15, attribute))))
 
     # Calculate and return the proportion of alters within the specified category
     if (dim(selected_cols)[2] == 0) {
         warning(sprintf(
-            "Error: Cannot find columns related to `%s`. Returning NA...",
-            keyword
+            "Cannot find columns related to `%s`. Returning NA...",
+            attribute
         ))
         return(NA)
     } else {
@@ -740,257 +708,5 @@ calc_prop_alters_singleans <- function(
             length(which(selected_cols %in% mapping[categories])) /
                 n_alters(persnet_row)
         )
-    }
-}
-
-##################### Constructing/Exporting Data Frame #######################
-
-###################### Single Network Visualizations ###########################
-
-#Note: if outputting individual network graphs through pdf() function begins giving
-#  errors of invalid fonts, this may be caused by ggraph's fonts not being used.
-#  You may need to change font family under theme_graph() to a font listed at this link
-#  https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/postscriptFonts.html
-
-plot_single_network_node_labels <- function(
-    tidygra,
-    ego_name = NULL,
-    fig_title = NULL,
-    friend_fill = "#89b53c",
-    family_fill = "#007080",
-    friend_txt = "white",
-    family_txt = "white",
-    weak_color = "#236782",
-    strong_color = "#c26c21"
-) {
-    # # # # #
-    # Function: Plots a personal network graph using ggraph, distinguishing
-    #           between strong and weak ties and highlighting the ego node.
-    # Inputs: tidygra = A tidygraph object representing a personal network
-    # Outputs: A ggplot object visualizing the network structure
-    # # # # #
-
-    # Test if valid tidygra input
-    if (is.null(tidygra) || !"tbl_graph" %in% class(tidygra)) {
-        warning("Warning: Graph is missing or invalid. Skipping.")
-        return(NA) # Skip invalid graphs
-    }
-
-    # Test whether the network is an isolate (no weight edge attribute)
-    edge_attributes <- tidygra %>%
-        tidygraph::activate(edges) %>%
-        tibble::as_tibble()
-    if (!"weight" %in% colnames(edge_attributes)) {
-        # Plot isolate (ego only)
-        tg_plot <- ggraph(tidygra, layout = "fr") +
-            geom_node_point(size = 4, color = 'black', show.legend = FALSE) +
-            theme_graph(base_family = "Helvetica-Narrow")
-
-        return(tg_plot)
-    }
-
-    # Check if ego is present in the graph, and if so, focus layout on ego
-    node_names <- unique(tidygra %N>% dplyr::pull(name))
-
-    # Transform tie strength into strong/weak strings and create an alter dummy variable
-    tidygra <- tidygra %>%
-        tidygraph::activate(edges) %>%
-        dplyr::mutate(
-            strength_of_tie = ifelse(weight == 1, "weak", "strong")
-        ) %>%
-        tidygraph::activate(nodes) %>%
-        dplyr::mutate(alter_dummy = ifelse(name != "ego", 1, 0)) %>%
-        dplyr::mutate(
-            node_fill = dplyr::case_when(
-                name == "ego" ~ "black",
-                grepl("^Friend", name) ~ friend_fill,
-                grepl("^Family", name) ~ family_fill,
-                .default = "white"
-            )
-        ) %>%
-        dplyr::mutate(
-            node_text_color = dplyr::case_when(
-                name == "ego" ~ "white",
-                grepl("^Friend", name) ~ friend_txt,
-                grepl("^Family", name) ~ family_txt,
-                .default = "black"
-            )
-        )
-
-    record_id <- tidygra %N>% dplyr::pull(record_id) %>% unique() %>% .[1]
-    ttl <- ifelse(is.null(fig_title), paste("Record ID:", record_id), fig_title)
-
-    if ("ego" %in% node_names) {
-        focus_index <- which(node_names == "ego")
-
-        # Change "ego" name if a new one was passed
-        if (!is.null(ego_name)) {
-            tidygra <- tidygra %N>%
-                dplyr::mutate(
-                    name = ifelse(row_number() == focus_index, ego_name, name)
-                )
-        }
-
-        # Plot network with ego as focal point
-        tg_plot <- ggraph(tidygra, layout = "focus", focus = focus_index) +
-            geom_edge_link(
-                aes(color = strength_of_tie, linetype = strength_of_tie),
-                edge_width = 0.75,
-                show.legend = FALSE
-            ) +
-            scale_edge_linetype_manual(
-                values = c("weak" = "dashed", "strong" = "solid")
-            ) +
-            scale_edge_color_manual(
-                values = c("weak" = weak_color, "strong" = strong_color)
-            ) +
-            geom_node_point(
-                aes(color = factor(alter_dummy)),
-                size = 4,
-                show.legend = FALSE
-            ) +
-            scale_colour_manual(values = c('black', 'grey66')) +
-            geom_node_label(
-                aes(label = name, fill = node_fill, color = node_text_color),
-                size = 4,
-                label.padding = unit(0.25, "lines"),
-                label.size = 0.5,
-                show.legend = FALSE
-            ) +
-            scale_color_identity() +
-            scale_fill_identity() +
-            ggtitle(ttl) +
-            theme_graph(base_family = "Helvetica-Narrow")
-
-        return(tg_plot)
-    } else {
-        # Plot network without ego as focal point
-        tg_plot <- ggraph(tidygra, layout = "fr") +
-            geom_edge_link(
-                aes(color = strength_of_tie, linetype = strength_of_tie),
-                edge_width = 0.75,
-                show.legend = FALSE
-            ) +
-            scale_edge_linetype_manual(
-                values = c("weak" = "dashed", "strong" = "solid")
-            ) +
-            scale_edge_color_manual(
-                values = c("weak" = weak_color, "strong" = strong_color)
-            ) +
-            geom_node_point(size = 4, color = 'grey66', show.legend = FALSE) +
-            geom_node_label(
-                aes(label = name, fill = node_fill, color = node_text_color),
-                size = 4,
-                label.padding = unit(0.25, "lines"),
-                label.size = 0.5,
-                show.legend = FALSE
-            ) +
-            scale_color_identity() +
-            scale_fill_identity() +
-            ggtitle(ttl) +
-            theme_graph(base_family = "Helvetica-Narrow")
-
-        return(tg_plot)
-    }
-}
-
-###################### Network Montage Visualization ##########################
-
-plot_single_network <- function(
-    tidygra,
-    edge_size = 0.5,
-    node_size = 2,
-    weak_color = "#236782",
-    strong_color = "#c26c21"
-) {
-    # # # # # # # #
-    # Function: Plots a personal network graph using ggraph, distinguishing
-    #           between strong and weak ties and highlighting the ego node.
-    # Inputs: tidygra = A tidygraph object representing a personal network
-    # Outputs: A ggplot object visualizing the network structure
-    # # # # # # # #
-
-    # Test if valid tidygra input
-    if (is.null(tidygra) || !"tbl_graph" %in% class(tidygra)) {
-        warning("Warning: Graph is missing or invalid. Skipping.")
-        return(NA) # Skip invalid graphs
-    }
-
-    # Test whether the network is an isolate (no weight edge attribute)
-    edge_attributes <- tidygra %>%
-        tidygraph::activate(edges) %>%
-        tibble::as_tibble()
-    if (!"weight" %in% colnames(edge_attributes)) {
-        # Plot isolate (ego only)
-        tg_plot <- ggraph(tidygra, layout = "fr") +
-            geom_node_point(
-                size = node_size,
-                color = 'black',
-                show.legend = FALSE
-            ) +
-            theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-        return(tg_plot)
-    } else {
-        # Check if ego is present in the graph, and if so, focus layout on ego
-        node_names <- unique(tidygra %N>% dplyr::pull(name))
-
-        # Transform tie strength into strong/weak strings and create an alter dummy variable
-        tidygra <- tidygra %>%
-            tidygraph::activate(edges) %>%
-            dplyr::mutate(
-                strength_of_tie = ifelse(weight == 1, "weak", "strong")
-            ) %>%
-            tidygraph::activate(nodes) %>%
-            dplyr::mutate(alter_dummy = ifelse(name != 'ego', 1, 0))
-
-        if ("ego" %in% node_names) {
-            focus_index <- which(node_names == "ego")
-
-            # Plot network with ego as focal point
-            tg_plot <- ggraph(tidygra, layout = "focus", focus = focus_index) +
-                geom_edge_link(
-                    aes(color = strength_of_tie, linetype = strength_of_tie),
-                    edge_width = edge_size,
-                    show.legend = FALSE
-                ) +
-                scale_edge_linetype_manual(
-                    values = c("weak" = "solid", "strong" = "solid")
-                ) +
-                scale_edge_colour_manual(
-                    values = c("weak" = weak_color, "strong" = strong_color)
-                ) +
-                geom_node_point(
-                    aes(color = factor(alter_dummy)),
-                    size = node_size,
-                    show.legend = FALSE
-                ) +
-                scale_colour_manual(values = c('black', 'grey66')) +
-                theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-            return(tg_plot)
-        } else {
-            # Plot network without ego as focal point
-            tg_plot <- ggraph(tidygra, layout = "fr") +
-                geom_edge_link(
-                    aes(color = strength_of_tie, linetype = strength_of_tie),
-                    edge_width = edge_size,
-                    show.legend = FALSE
-                ) +
-                scale_edge_linetype_manual(
-                    values = c("weak" = "solid", "strong" = "solid")
-                ) +
-                scale_edge_colour_manual(
-                    values = c("weak" = weak_color, "strong" = strong_color)
-                ) +
-                geom_node_point(
-                    size = node_size,
-                    color = 'grey66',
-                    show.legend = FALSE
-                ) +
-                theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-            return(tg_plot)
-        }
     }
 }
