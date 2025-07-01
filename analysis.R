@@ -35,6 +35,9 @@ library(ggraph)
 library(patchwork)
 library(rstudioapi)
 
+#Clearing Working Directory
+rm(list = ls())
+
 ### Locate data
 data_file <- "L:/Research Project Current/Social Connectedness/data/persnet/soccon_persnet_demographic_2025-06-10_fakenames.csv"
 # data_file <- "fake_data.csv"
@@ -42,9 +45,6 @@ dict_file <- "L:/Research Project Current/Social Connectedness/data/persnet/socc
 
 out_dir <- "L:/Research Project Current/Social Connectedness/data/persnet/"
 out_suffix <- "fakenames"
-
-#Clearing Working Directory
-rm(list = ls())
 
 #Automatically set working directory, requires rstudioapi package. If not working set WD manually
 #to do so manually go to Session -> Set Working Directory -> To Source File location
@@ -54,10 +54,12 @@ rm(list = ls())
 setwd(dirname(getActiveDocumentContext()$path))
 
 # Get funcs
-source("funcs.R")
+source("utils.R")
+source("metrics.R")
+source("viz.R")
 
 
-######################### ANALYSIS ##############################
+############# ANALYSIS #############
 #Importing data
 df_input <- read.csv(
     data_file,
@@ -67,7 +69,9 @@ df_input <- read.csv(
 
 df_dict <- read.csv(dict_file)
 
+############### EGO ###############
 
+################# Extracting values #################
 ### record_id
 record_id = df_input$record_id
 
@@ -76,53 +80,45 @@ age = df_input$age
 
 ### sex
 sex_map <- get_codebook_mapping(df_dict, "sex")
-sex <- factor(df_input$sex, levels = sex_map$levels, labels = sex_map$labels)
+sex <- names(sex_map[df_input$sex])
 
 ### race
-#purrr applies the same function to a list, in this case, each row of df_input
-#the blank space between .x, , is selecting all columns of df_input
-#while drop= FALSE forces R to return not a vector but a dataframe object
-race_labels <- get_codebook_mapping(df_dict, "race")$labels
-ego_race <- lapply(1:4, function(n) {
-    {
-        purrr::map_chr(
-            1:nrow(df_input),
-            ~ extract_attribute(
-                df_input[.x, , drop = FALSE],
-                n,
-                race_labels,
-                "race"
-            )
-        )
-    } %>%
-        factor(race_labels)
-})
-
-### education
-# Sometimes this is "edu", sometimes "education". Since used twice, set as val here
-edu_name <- "education"
-edu_map <- get_codebook_mapping(df_dict, edu_name)
-df_input$edu <- factor(
-    df_input[, edu_name],
-    levels = edu_map$levels,
-    labels = edu_map$labels
+# purrr applies the same function to a list, in this case, each row of df_input
+# the blank space between .x, , is selecting all columns of df_input
+# while drop= FALSE forces R to return not a vector but a dataframe object
+race_map <- get_codebook_mapping(df_dict, "race")
+ego_races <- purrr::map(
+    1:nrow(df_input),
+    ~ extract_ego_multi_attributes(
+        df_input[.x, , drop = FALSE],
+        "race",
+        race_map
+    )
 )
-education <- df_input$edu
 
-### zip
+### Employment
+employ_map <- get_codebook_mapping(df_dict, "employment")
+ego_employ <- purrr::map(
+    1:nrow(df_input),
+    ~ extract_ego_multi_attributes(
+        df_input[.x, , drop = FALSE],
+        "employment",
+        employ_map
+    )
+)
+
+### Education
+edu_map <- get_codebook_mapping(df_dict, "education")
+education <- names(edu_map[df_input$education])
+
+### Zip
 zip = as.character(df_input$zip)
 
-### smoking
+### Smoking
 smoke_map <- get_codebook_mapping(df_dict, "smoke")
+smoke <- names(smoke_map[df_input$smoke])
 
-df_input$smoke <- factor(
-    df_input$smoke,
-    levels = smoke_map$levels,
-    labels = smoke_map$labels
-)
-smoke = df_input$smoke
-
-### Network stats
+################# Network Stats #################
 network_size = calc_total_alters_df(df_input)
 density = calc_egoless_density_df(df_input)
 
@@ -132,20 +128,21 @@ effsize = sapply(gra_list, calc_node_ens)
 mean_degree = sapply(gra_list, calc_egoless_mean_degree)
 max_degree = sapply(gra_list, calc_egoless_max_degree)
 
-### Alters data
-# All relationship mapping will be the same, so just take the first one
+############### ALTERS ###############
+
+################# IQV #################
 age_sd = purrr::map_dbl(
     1:nrow(df_input),
     ~ sd_age_alters_row(df_input[.x, , drop = FALSE])
 )
 
-gender_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1sex"))
+gender_map <- get_codebook_mapping(df_dict, "name1sex")
 iqv_sex <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_attribute_iqv(df_input[.x, , drop = FALSE], "sex", gender_map)
 )
 
-race_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1race"))
+race_map <- get_codebook_mapping(df_dict, "name1race")
 iqv_race <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_attribute_iqv(df_input[.x, , drop = FALSE], "race", race_map)
@@ -162,7 +159,10 @@ iqv_educ <- purrr::map_dbl(
     ~ calc_attribute_iqv(df_input[.x, , drop = FALSE], "educ", educ_map)
 )
 
-relat_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1relat"))
+################# Proportions #################
+
+# All mappings will be the same, so just take the first one
+relat_map <- get_codebook_mapping(df_dict, "name1relat")
 kin_prop <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_prop_alters_multians(
@@ -173,18 +173,18 @@ kin_prop <- purrr::map_dbl(
     )
 )
 
-speak_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1speak"))
+speak_map <- get_codebook_mapping(df_dict, "name1speak")
 weak_freq_prop <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("Monthly", "Less often"),
         speak_map,
-        "speak",
+        "speak"
     )
 )
 
-len_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1length"))
+len_map <- get_codebook_mapping(df_dict, "name1length")
 weak_dur_prop <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_prop_alters_singleans(
@@ -195,18 +195,18 @@ weak_dur_prop <- purrr::map_dbl(
     )
 )
 
-dist_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1dist"))
+dist_map <- get_codebook_mapping(df_dict, "name1dist")
 far_dist_prop <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_prop_alters_singleans(
         df_input[.x, , drop = FALSE],
         c("16-50 miles", "50+ miles"),
-        len_map,
+        dist_map,
         "dist"
     )
 )
 
-als_map <- codebook_to_dict(get_codebook_mapping(df_dict, "name1als"))
+als_map <- get_codebook_mapping(df_dict, "name1als")
 met_through_als_prop <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_prop_alters_singleans(
@@ -217,39 +217,13 @@ met_through_als_prop <- purrr::map_dbl(
     )
 )
 
-
-# heavy_drinkers_prop <- purrr::map_dbl(
-#     1:nrow(df_input),
-#     ~ prop_heavy_drinkers_row(df_input[.x, , drop = FALSE])
-# )
-
-# smoking_prop <- purrr::map_dbl(
-#     1:nrow(df_input),
-#     ~ calc_prop_alters_smoke(df_input[.x, , drop = FALSE])
-# )
-
-# no_exercise_prop <- purrr::map_dbl(
-#     1:nrow(df_input),
-#     ~ calc_prop_alters_exercise(df_input[.x, , drop = FALSE])
-# )
-
-# bad_diet_prop <- purrr::map_dbl(
-#     1:nrow(df_input),
-#     ~ calc_prop_alters_diet(df_input[.x, , drop = FALSE])
-# )
-
-# health_prob_prop <- purrr::map_dbl(
-#     1:nrow(df_input),
-#     ~ alter_health_problems_row(df_input[.x, , drop = FALSE])
-# )
-
+################# Blau #################
 blau_gender <- purrr::map_dbl(
     1:nrow(df_input),
     ~ calc_blau_alter_heterophily(
         df_input[.x, , drop = FALSE],
         "sex",
-        gender_map,
-        FALSE
+        gender_map
     )
 )
 
@@ -258,8 +232,7 @@ blau_educ <- purrr::map_dbl(
     ~ calc_blau_alter_heterophily(
         df_input[.x, , drop = FALSE],
         attribute = "educ",
-        educ_map,
-        FALSE
+        educ_map
     )
 )
 
@@ -268,8 +241,7 @@ blau_distance <- purrr::map_dbl(
     ~ calc_blau_alter_heterophily(
         df_input[.x, , drop = FALSE],
         attribute = "dist",
-        dist_map,
-        FALSE
+        dist_map
     )
 )
 
@@ -278,8 +250,7 @@ blau_length <- purrr::map_dbl(
     ~ calc_blau_alter_heterophily(
         df_input[.x, , drop = FALSE],
         attribute = "length",
-        len_map,
-        FALSE
+        len_map
     )
 )
 
@@ -288,36 +259,21 @@ blau_speak <- purrr::map_dbl(
     ~ calc_blau_alter_heterophily(
         df_input[.x, , drop = FALSE],
         attribute = "speak",
-        speak_map,
-        FALSE
+        speak_map
     )
 )
 
-
-# If you have taken away variables or changed variables, you need to comment out
-# variables not included in your dataset in the code section below.
+############# MAKE OUTPUTS #############
+############### Data Table ###############
 df_clean = tibble::tibble(
     record_id = record_id,
     age = age,
     sex = sex,
-    race1 = race1,
-    race2 = race2,
+    race1 = sapply(ego_races, "[", 1),
+    race2 = sapply(ego_races, "[", 2),
     education = education,
+    employment = sapply(ego_employ, "[", 1),
     zip = zip,
-    # employment = employment,
-    # occupation = occupation,
-    # income = income,
-    # married = married,
-    # live_alone = live_alone,
-    # household_number = household_number,
-    # ego_alcohol = alcohol,
-    # ego_smoke = smoke,
-    # ego_exercise = exercise,
-    # ego_healty_diet = diet,
-    # health_problems1 = health_prob1,
-    # health_problems2 = health_prob2,
-    # health_problems3 = health_prob3,
-    # health_problems4 = health_prob4,
     network_size = network_size,
     density = density,
     constraint = constraint,
@@ -327,16 +283,11 @@ df_clean = tibble::tibble(
     kin_prop = kin_prop,
     age_sd = age_sd,
     IQV_sex = iqv_sex,
-    # IQV_race = iqv_race,
+    IQV_race = iqv_race,
     IQV_educ = iqv_educ,
     weak_freq_prop = weak_freq_prop,
     weak_dur_prop = weak_dur_prop,
     far_dist_prop = far_dist_prop,
-    heavy_drinkers_prop = heavy_drinkers_prop,
-    smoking_prop = smoking_prop,
-    # no_exercise_prop = no_exercise_prop,
-    bad_diet_prop = bad_diet_prop,
-    # health_prob_prop = health_prob_prop,
     blau_gender = blau_gender,
     blau_educ = blau_educ,
     blau_distance = blau_distance,
@@ -346,7 +297,7 @@ df_clean = tibble::tibble(
 
 df_clean$zip <- as.character(df_clean$zip) #double check zip as string
 
-######################### FIGURES ##############################
+############### FIGURES ###############
 df_relat_names <- names_to_relat(df_input, relat_map)
 list_tidygras <- organize_list_tidygraphs(df_relat_names)
 list_network_plots_labels <- mapply(
@@ -356,6 +307,7 @@ list_network_plots_labels <- mapply(
     SIMPLIFY = FALSE
 )
 
+############# SAVE OUTPUTS #############
 
 #This section creates a montage of network graphs in a grid orientation from top
 #  left to bottom right. These graphs are purposefully stripped of alter names
@@ -369,6 +321,7 @@ list_network_plots_labels <- mapply(
 #  Note that at smaller output sizes and/or larger datasets you may need to reduce the
 #  graph_scale, otherwise the edges/nodes will be too large for their respective graphs.
 
+############### Setup ###############
 
 #Width in inches of the output PDF
 output_width <- 7.5
@@ -408,6 +361,7 @@ wrap_list_network_plots <- wrap_plots(
     ncol = est_column_count
 )
 
+############### WRITE ###############
 
 ### Writing files
 write.csv(
@@ -459,132 +413,3 @@ for (plt in list_network_plots_labels) {
 }
 
 dev.off()
-
-### Employment
-#### TODO: Update this so that it works for employment___X
-# df_input$employment <- factor(df_input$employment,
-#                               levels = c(1, 2, 3, 4, 5, 6, 7, 0),
-#                               labels = c("Employed for wages", "Self-employed",
-#                                          "Out of work and looking for work",
-#                                          "Student", "Retired",
-#                                          "Unable to work", "Prefer not to answer",
-#                                          "Out of work but not currently looking for work"))
-# employment = df_input$employment
-#
-
-### Occupation
-# df_input$occupation <- factor(df_input$occupation,
-#                               levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "77"),
-#                               labels = c("Executive, manager",
-#                                          "Sales or clerical worker",
-#                                          "Mechanic, electrician, skilled worker",
-#                                          "Machine operator, inspector, bus/cab driver",
-#                                          "Service worker",
-#                                          "Professional", "Business owner",
-#                                          "Laborer, unskilled worker", "Farming",
-#                                          "Military", "Other"))
-# occupation = df_input$occupation
-
-### Income
-# df_input$income <- factor(df_input$income,
-#                           levels = c("1", "2", "3", "4", "5"),
-#                           labels = c("less than $5,000", "$5,000 to $49,000",
-#                                      "$50,000 to $169,000", "$170,000 to $490,000",
-#                                      "more than $500,000"))
-# income = df_input$income
-
-### Married
-# df_input$married <- factor(df_input$married,
-#                            levels = c(0, 1),
-#                            labels = c("Not married", "Married"))
-# married = df_input$married
-
-### Live Alone
-# df_input$live_alone <- factor(df_input$live_alone, levels = c(0, 1),
-#                               labels = c("No", "Yes"))
-# live_alone = df_input$live_alone
-
-### Household Number
-# household_number = df_input$household_number
-#
-
-### Alcohol
-# df_input$alcohol <- factor(df_input$alcohol,
-#                            levels = c(0, 1, 9),
-#                            labels = c("No", "Yes", "I do not drink heavily"))
-# alcohol = df_input$alcohol
-
-### Exercise
-# df_input$exercise <- factor(df_input$exercise,
-#                             levels = c(0, 1),
-#                             labels = c("No", "Yes"))
-# exercise = df_input$exercise
-
-### Diet
-# df_input$diet <- factor(df_input$diet,
-#                         levels = c(0, 1),
-#                         labels = c("No", "Yes"))
-# diet = df_input$diet
-
-### Health Problems
-# health_prob1 = purrr::map_chr(
-#     1:nrow(df_input),
-#     ~ extract_health_problems(df_input[.x, , drop = FALSE], health_numeric = 1)
-# ) %>%
-#     factor(c(
-#         "General",
-#         "Pain",
-#         "Cognitive_MentalHealth",
-#         "Cardiac",
-#         "NoProblems"
-#     ))
-# health_prob1
-
-# health_prob2 = purrr::map_chr(
-#     1:nrow(df_input),
-#     ~ extract_health_problems(df_input[.x, , drop = FALSE], health_numeric = 2)
-# ) %>%
-#     factor(c(
-#         "General",
-#         "Pain",
-#         "Cognitive_MentalHealth",
-#         "Cardiac",
-#         "NoProblems"
-#     ))
-# health_prob2
-
-# health_prob3 = purrr::map_chr(
-#     1:nrow(df_input),
-#     ~ extract_health_problems(df_input[.x, , drop = FALSE], health_numeric = 3)
-# ) %>%
-#     factor(c(
-#         "General",
-#         "Pain",
-#         "Cognitive_MentalHealth",
-#         "Cardiac",
-#         "NoProblems"
-#     ))
-# health_prob3
-
-# health_prob4 = purrr::map_chr(
-#     1:nrow(df_input),
-#     ~ extract_health_problems(df_input[.x, , drop = FALSE], health_numeric = 4)
-# ) %>%
-#     factor(c(
-#         "General",
-#         "Pain",
-#         "Cognitive_MentalHealth",
-#         "Cardiac",
-#         "NoProblems"
-#     ))
-# health_prob4
-
-############################# Trouble-shooting ################################
-
-# - If you have difficulties, run line-by-line to find the error
-
-# - Look at your raw data and clean or remove rows with missing data. This code
-# does not clean your data. It's processes data assuming the survey was filled
-# out correctly.
-
-# - If still not working, then email adhand@bwh.harvard.edu.
