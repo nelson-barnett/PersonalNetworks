@@ -39,12 +39,11 @@ library(rstudioapi)
 rm(list = ls())
 
 ### Locate data
-data_file <- "L:/Research Project Current/Social Connectedness/data/persnet/soccon_persnet_demographic_2025-06-10_fakenames.csv"
-# data_file <- "fake_data.csv"
-dict_file <- "L:/Research Project Current/Social Connectedness/data/persnet/soccon_datadict.csv"
+data_file <- "fake_data.csv"
+dict_file <- "data_dict.csv"
 
-out_dir <- "L:/Research Project Current/Social Connectedness/data/persnet/"
-out_suffix <- "fakenames"
+out_dir <- ""
+out_suffix <- ""
 
 #Automatically set working directory, requires rstudioapi package. If not working set WD manually
 #to do so manually go to Session -> Set Working Directory -> To Source File location
