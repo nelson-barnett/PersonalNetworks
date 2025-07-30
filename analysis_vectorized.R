@@ -89,25 +89,11 @@ sex <- names(sex_map[df_input$sex])
 # the blank space between .x, , is selecting all columns of df_input
 # while drop= FALSE forces R to return not a vector but a dataframe object
 race_map <- get_codebook_mapping(df_dict, "race")
-ego_races <- purrr::map(
-    1:nrow(df_input),
-    ~ extract_ego_multi_attributes(
-        df_input[.x, , drop = FALSE],
-        "race",
-        race_map
-    )
-)
+ego_races <- extract_ego_multi_attributes(df_input, "race", race_map)
 
 ### Employment
 employ_map <- get_codebook_mapping(df_dict, "employment")
-ego_employ <- purrr::map(
-    1:nrow(df_input),
-    ~ extract_ego_multi_attributes(
-        df_input[.x, , drop = FALSE],
-        "employment",
-        employ_map
-    )
-)
+ego_employ <- extract_ego_multi_attributes(df_input, "employment", employ_map)
 
 ### Education
 edu_map <- get_codebook_mapping(df_dict, "education")
@@ -142,7 +128,7 @@ educ_map <- list(
     only_high_school = c(1, 2),
     some_college = c(3, 4),
     college_grad = c(5, 6),
-    dont_know = c(99)
+    dont_know = 99
 )
 iqv_educ <- calc_attribute_iqv(df_input, "educ", educ_map)
 

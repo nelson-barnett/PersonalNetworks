@@ -142,43 +142,30 @@ n_alters <- function(df_input) {
 }
 
 extract_ego_multi_attributes <- function(
-    persnet_row,
+    df,
     attribute,
     mapping
 ) {
     # # # # # # #
     # Function: Extract the labels for all values of the attribute in a checkbox/multi answer style field (e.g. race___1, race___2, etc.)
     # Inputs:
-    #   persnet_row = A single row of a personal network data frame
+    #   df = A single row of a personal network data frame
     #   attribute = `String` name of attribute in question (e.g. "race")
     #   mapping = `named double` with labels as names and integers as values
     # Outputs:
     #   `character vector` containing the labels from mapping for each value in the attribute columns
     # # # # # # #
 
-    # Get attribute column names
-    cols <- grep(
-        sprintf("^%s_*\\d+$", attribute),
-        names(persnet_row),
-        value = TRUE
-    )
+    # Get all the columns for this attribute
+    # rename the columns to their mapping name (number after underscores is the value whose name to extract)
+    attr_cols <- df %>%
+        dplyr::select(dplyr::matches(sprintf("^%s_*\\d+$", attribute))) %>%
+        dplyr::rename_with(~ names(mapping[grep("_(.*)", .x)]))
 
-    #### WIP (get all the values that are not 0 for every row in df)
-    # selected_cols <- df %>%
-    #     dplyr::select(dplyr::matches(sprintf("^%s_*\\d+$", attribute))) %>%
-    #     dplyr::rename_with(~ names(mapping[grep("_(.*)", .x)]))
-
-    # w <- which(selected_cols == 1, arr.ind = TRUE)
-    # selected_cols[w] <- names(selected_cols)[w[,"col"]]
-
-    # Get NUM in attribute___NUM for all columns where the value == 1, get label from mapping
-    return(
-        mapping[
-            sub(".*_", "", cols[which(persnet_row[cols] == 1)]) %>%
-                as.numeric()
-        ] %>%
-            names()
-    )
+    # For every row, get the names of all columns containing a 1
+    return(lapply(1:nrow(attr_cols), \(x) {
+        names(attr_cols)[attr_cols[x, ] == 1]
+    }))
 }
 
 prop_of_qnames_in_network <- function(df, q_num, names_per_q = 5) {
@@ -587,7 +574,7 @@ calc_blau_alter_heterophily <- function(
             (purrr::map(names(mapping), \(x) {
                 calc_prop_alters_singleans(df, x, mapping, attribute)^2
             }) %>%
-                dplyr::bind_cols() %>%
+                dplyr::bind_cols(.name_repair = "unique_quiet") %>%
                 rowSums()),
         digits = 2
     ))
@@ -744,10 +731,14 @@ calc_prop_alters_singleans <- function(
             1
         # Convert all but those in the category to NA and compute the sum of each row.
         # Divide by number of alters
+        # NOTE: unlisting allows for mappings to be lists or numeric vectors
+        # Without unlisting, `mapping`s that are lists need [[, 
+        # which errors if `categories` has more than one value. 
+        # Unlisting ensures everything works as expected
         props <- selected_cols %>%
             mutate(across(
                 everything(),
-                ~ ifelse(. %in% mapping[categories], 1, NA)
+                ~ ifelse(.x %in% unlist(mapping[categories]), 1, NA)
             )) %>%
             rowSums(na.rm = TRUE) /
             n_alters(df)
