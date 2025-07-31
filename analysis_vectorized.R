@@ -117,12 +117,11 @@ mean_degree = sapply(gra_list, calc_egoless_mean_degree)
 max_degree = sapply(gra_list, calc_egoless_max_degree)
 
 ############### ALTERS ###############
-
-################# IQV #################
 age_sd <- calc_numeric_attr_sd(df_input, "age")
 
+################# IQV #################
 gender_map <- get_codebook_mapping(df_dict, "name1sex")
-iqv_sex <- calc_attribute_iqv(df_input, "sex", gender_map)
+iqv_sex <- round(calc_attribute_iqv(df_input, "sex", gender_map), digits = 2)
 
 educ_map <- list(
     only_high_school = c(1, 2),
@@ -130,10 +129,9 @@ educ_map <- list(
     college_grad = c(5, 6),
     dont_know = 99
 )
-iqv_educ <- calc_attribute_iqv(df_input, "educ", educ_map)
+iqv_educ <- round(calc_attribute_iqv(df_input, "educ", educ_map), digits = 2)
 
 ################# Proportions #################
-
 prop_q1_in_network <- prop_of_qnames_in_network(df_input, 1)
 prop_q2_in_network <- prop_of_qnames_in_network(df_input, 2)
 prop_q3_in_network <- prop_of_qnames_in_network(df_input, 3)
@@ -180,11 +178,26 @@ met_through_als_prop <- calc_prop_alters_singleans(
 )
 
 ################# Blau #################
-blau_gender <- calc_blau_alter_heterophily(df_input, "sex", gender_map)
-blau_edu <- calc_blau_alter_heterophily(df_input, "educ", educ_map)
-blau_dist <- calc_blau_alter_heterophily(df_input, "dist", dist_map)
-blau_length <- calc_blau_alter_heterophily(df_input, "length", length_map)
-blau_speak <- calc_blau_alter_heterophily(df_input, "speak", speak_map)
+blau_gender <- round(
+    calc_blau_alter_heterophily(df_input, "sex", gender_map),
+    digits = 2
+)
+blau_edu <- round(
+    calc_blau_alter_heterophily(df_input, "educ", educ_map),
+    digits = 2
+)
+blau_dist <- round(
+    calc_blau_alter_heterophily(df_input, "dist", dist_map),
+    digits = 2
+)
+blau_length <- round(
+    calc_blau_alter_heterophily(df_input, "length", length_map),
+    digits = 2
+)
+blau_speak <- round(
+    calc_blau_alter_heterophily(df_input, "speak", speak_map),
+    digits = 2
+)
 
 ############# MAKE OUTPUTS #############
 ############### Data Table ###############
