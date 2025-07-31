@@ -11,6 +11,7 @@ plot_single_network_node_labels <- function(
     tidygra,
     ego_name = NULL,
     fig_title = NULL,
+    node_size = 6,
     friend_fill = "#89b53c",
     family_fill = "#007080",
     friend_txt = "white",
@@ -110,21 +111,23 @@ plot_single_network_node_labels <- function(
             ) +
             geom_node_point(
                 aes(color = factor(alter_dummy)),
-                size = 4,
+                size = node_size,
                 show.legend = FALSE
             ) +
             scale_colour_manual(values = c('black', 'grey66')) +
             geom_node_label(
                 aes(label = name, fill = node_fill, color = node_text_color),
-                size = 4,
+                size = node_size,
                 label.padding = unit(0.25, "lines"),
                 label.size = 0.5,
-                show.legend = FALSE
+                show.legend = FALSE,
             ) +
             scale_color_identity() +
             scale_fill_identity() +
             ggtitle(ttl) +
-            theme_graph(base_family = "Helvetica-Narrow")
+            theme_graph(base_family = "Helvetica-Narrow") + 
+            scale_x_continuous(expand = expansion(.15)) +
+            scale_y_continuous(expand = expansion(.25))
 
         return(tg_plot)
     } else {
@@ -141,10 +144,10 @@ plot_single_network_node_labels <- function(
             scale_edge_color_manual(
                 values = c("weak" = weak_color, "strong" = strong_color)
             ) +
-            geom_node_point(size = 4, color = 'grey66', show.legend = FALSE) +
+            geom_node_point(size = node_size, color = 'grey66', show.legend = FALSE) +
             geom_node_label(
                 aes(label = name, fill = node_fill, color = node_text_color),
-                size = 4,
+                size = node_size,
                 label.padding = unit(0.25, "lines"),
                 label.size = 0.5,
                 show.legend = FALSE
