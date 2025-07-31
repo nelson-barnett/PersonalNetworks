@@ -121,7 +121,7 @@ age_sd <- calc_numeric_attr_sd(df_input, "age")
 
 ################# IQV #################
 gender_map <- get_codebook_mapping(df_dict, "name1sex")
-iqv_sex <- round(calc_attribute_iqv(df_input, "sex", gender_map), digits = 2)
+iqv_sex <- calc_attribute_iqv(df_input, "sex", gender_map)
 
 educ_map <- list(
     only_high_school = c(1, 2),
@@ -129,7 +129,7 @@ educ_map <- list(
     college_grad = c(5, 6),
     dont_know = 99
 )
-iqv_educ <- round(calc_attribute_iqv(df_input, "educ", educ_map), digits = 2)
+iqv_educ <- calc_attribute_iqv(df_input, "educ", educ_map)
 
 ################# Proportions #################
 prop_q1_in_network <- prop_of_qnames_in_network(df_input, 1)
@@ -178,26 +178,11 @@ met_through_als_prop <- calc_prop_alters_singleans(
 )
 
 ################# Blau #################
-blau_gender <- round(
-    calc_blau_alter_heterophily(df_input, "sex", gender_map),
-    digits = 2
-)
-blau_edu <- round(
-    calc_blau_alter_heterophily(df_input, "educ", educ_map),
-    digits = 2
-)
-blau_dist <- round(
-    calc_blau_alter_heterophily(df_input, "dist", dist_map),
-    digits = 2
-)
-blau_length <- round(
-    calc_blau_alter_heterophily(df_input, "length", length_map),
-    digits = 2
-)
-blau_speak <- round(
-    calc_blau_alter_heterophily(df_input, "speak", speak_map),
-    digits = 2
-)
+blau_gender <- calc_blau_alter_heterophily(df_input, "sex", gender_map)
+blau_edu <- calc_blau_alter_heterophily(df_input, "educ", educ_map)
+blau_dist <- calc_blau_alter_heterophily(df_input, "dist", dist_map)
+blau_length <- calc_blau_alter_heterophily(df_input, "length", length_map)
+blau_speak <- calc_blau_alter_heterophily(df_input, "speak", speak_map)
 
 ############# MAKE OUTPUTS #############
 ############### Data Table ###############
@@ -222,17 +207,16 @@ df_clean = tibble::tibble(
     prop_q3 = prop_q3_in_network,
     prop_through_als = met_through_als_prop,
     age_sd = age_sd,
-    IQV_sex = iqv_sex,
-    # IQV_race = iqv_race,
-    IQV_educ = iqv_educ,
+    IQV_sex = round(iqv_sex, digits = 2),
+    IQV_educ = round(iqv_educ, digits = 2),
     weak_freq_prop = weak_freq_prop,
     weak_dur_prop = weak_dur_prop,
     far_dist_prop = far_dist_prop,
-    blau_gender = blau_gender,
-    blau_educ = blau_educ,
-    blau_distance = blau_distance,
-    blau_length = blau_length,
-    blau_speak = blau_speak
+    blau_gender = round(blau_gender, digits = 2),
+    blau_educ = round(blau_educ, digits = 2),
+    blau_distance = round(blau_distance, digits = 2),
+    blau_length = round(blau_length, digits = 2),
+    blau_speak = round(blau_speak, digits = 2)
 )
 
 df_clean$zip <- as.character(df_clean$zip) #double check zip as string
