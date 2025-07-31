@@ -119,26 +119,18 @@ organize_list_tidygraphs <- function(persnet_df) {
 }
 
 
-n_alters <- function(df_input) {
+n_alters <- function(df) {
     # # # # # # # #
     # Function: Counts the number of alters in a network
-    # Inputs: persnet_row = one row of a persnet dataframe
-    # Outputs: `double` the nubmer of alters in the persnet row's network
+    # Inputs: df = Persnet dataframe
+    # Outputs: `double vector` the number of alters of each participant (row) in the input df
     # # # # # # # #
 
-    # Potentially also:
     return(
-        df_input %>%
+        df %>%
             dplyr::select(name_1:name_15) %>%
             rowSums()
     )
-
-    # return(sum(persnet_row %>% dplyr::select(name_1:name_15)))
-
-    # return(sum(
-    #     persnet_row %>% dplyr::select(tie1:tie15) != 0,
-    #     na.rm = TRUE
-    # ))
 }
 
 extract_ego_multi_attributes <- function(
@@ -147,13 +139,15 @@ extract_ego_multi_attributes <- function(
     mapping
 ) {
     # # # # # # #
-    # Function: Extract the labels for all values of the attribute in a checkbox/multi answer style field (e.g. race___1, race___2, etc.)
+    # Function: Extract the labels for all values of the attribute in a
+    #       checkbox/multi answer style field (e.g. race___1, race___2, etc.)
     # Inputs:
-    #   df = A single row of a personal network data frame
+    #   df = A personal network data frame
     #   attribute = `String` name of attribute in question (e.g. "race")
     #   mapping = `named double` with labels as names and integers as values
     # Outputs:
-    #   `character vector` containing the labels from mapping for each value in the attribute columns
+    #   `list` containing the labels from `mapping` for each value
+    #       in the attribute columns for each participant in the df (each row of df)
     # # # # # # #
 
     # Get all the columns for this attribute
@@ -169,11 +163,23 @@ extract_ego_multi_attributes <- function(
 }
 
 prop_of_qnames_in_network <- function(df, q_num, names_per_q = 5) {
-    # Names associated with question `q_num`
-    # Typically there are three questions, each capturing 5 names
+    # # # # # # #
+    # Function: Get the proportion of names in a network that came from a certain question
+    #   Typically, there are multiple "name generating" questions for a persnet survey
+    #   that each have a different prompt. Usually three questions, each capturing 5 names
+    # Inputs:
+    #   df = Personal network dataframe
+    #   q_num = `Integer` The question number.
+    #   names_per_q = `Integer` The number of names captured per question. Default: 5.
+    # Outputs:
+    #   `double vector` containing the proportion of names in a network from `q_num` for each participant (row of `df`)
+    # # # # # # #
 
+    # Get the bounding numbers (q_num = 2, names_per_q = 5 -> start at 6, end at 10)
     end_name_num <- q_num * names_per_q
-    start_name_num <- end_name_num - (names_per_q - 1)
+    start_name_num <- end_name_num - names_per_q + 1
+
+    # Rowsum the columns, divide by total number of alters to get proportion
     return(
         df %>%
             dplyr::select(dplyr::matches(sprintf(
@@ -534,6 +540,17 @@ calc_egoless_max_degree <- function(tg_graph) {
 ########################### Age Standard Deviation ############################
 
 calc_numeric_attr_sd <- function(df, attribute) {
+    # # # # # # # #
+    # Function: Calculates the standard deviation of alters' given numeric attribute (such as "age")
+    #   CAUTION: Make sure the attribute makes sense. SD of "sex" would not be a meaningful result.
+    # Inputs:
+    #   df = Personal network dataframe
+    #   attribute = The attribute name (must have numeric values)
+    # Outputs:
+    #   `double vector` = The standard deviation of the attribute for each participant (row) of `df`
+    # # # # # # # #
+
+    # Get the columns, summarize sd on the rows, round the output, deframe
     return(
         df %>%
             dplyr::select(dplyr::matches(sprintf(
@@ -542,8 +559,7 @@ calc_numeric_attr_sd <- function(df, attribute) {
                 attribute
             ))) %>%
             rowwise() %>%
-            summarize(std = sd(across(everything()), na.rm = TRUE)) %>%
-            round(digits = 2) %>%
+            summarize(stats::sd(across(everything()), na.rm = TRUE)) %>%
             deframe()
     )
 }
@@ -559,25 +575,25 @@ calc_blau_alter_heterophily <- function(
     # Function: Computes the Blau heterophily index for a specified alter attribute.
     #           The index measures diversity within a personal network.
     # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    #   attribute   = `string` attribute on which to calculate metric
-    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   df        = A personal network data frame
+    #   attribute = `string` attribute on which to calculate metric
+    #   mapping   = `named double` corresponding labels (names) and values (numeric) for the attribute
     # Outputs:
-    #   Blau heterophily index for the specified attribute
+    #   Blau heterophily index for the specified attribute for all participants in df (all rows)
     # # # # # # # #
 
     # Blau heterophily assumes mutually exclusive categories, so only use 'singleans'
 
-    # Apply calc_prop_alters_singleans to all names in mapping, returning a nested list, create a df from the nested list, then get the proportion
-    return(round(
+    # Apply calc_prop_alters_singleans to all names in mapping, returning a nested list,
+    # create a df from the nested list, then get the proportion
+    return(
         1 -
-            (purrr::map(names(mapping), \(x) {
-                calc_prop_alters_singleans(df, x, mapping, attribute)^2
+            (purrr::map(names(mapping), \(category) {
+                calc_prop_alters_singleans(df, category, mapping, attribute)^2
             }) %>%
                 dplyr::bind_cols(.name_repair = "unique_quiet") %>%
-                rowSums()),
-        digits = 2
-    ))
+                rowSums())
+    )
 }
 
 
@@ -591,23 +607,22 @@ calc_attribute_iqv <- function(
     #           alter attribute. The IQV measures diversity and variation within
     #           a personal network.
     # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    #   attribute   = `string` attribute on which to calculate metric
-    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   df        = A personal network data frame
+    #   attribute = `string` attribute on which to calculate metric
+    #   mapping   = `named double` corresponding labels (names) and values (numeric) for the attribute
     # Outputs:
     #   IQV value for the specified attribute
     # # # # # # # #
 
     # calculate IQV using Blau heterophily index and corresponding normalization factor
-    return(round(
+    return(
         calc_blau_alter_heterophily(
             df,
             attribute,
             mapping
         ) /
             (1 - (1 / length(mapping))),
-        digits = 2
-    ))
+    )
 }
 
 calc_prop_alters_multians <- function(
@@ -622,14 +637,15 @@ calc_prop_alters_multians <- function(
     #   Does not double count in the case where one alter is assigned multiple values in `categories`.
     #
     # Inputs:
-    #   df = A personal network data frame
-    #   categories  = `string` or `character vector` containing one or multiple categories from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
-    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
-    #   attribute   = `string` attribute in which categories can be found (e.g. "relat")
+    #   df         = A personal network data frame
+    #   categories = `string` or `character vector` containing one or multiple categories 
+    #       from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
+    #   mapping    = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   attribute  = `string` attribute in which categories can be found (e.g. "relat")
     # Outputs:
-    #   `double` Proportions of alters that have the category/one of the categories in `categories`.
+    #   `double vector` Proportions of alters that have the category/one of the categories in `categories`.
     #   Returns all NAs if cannot find columns related to `attribute`
-    #   Any isolate columns are scored as NA rather than 0.
+    #   Any isolate rows are scored as NA rather than 0.
     # # # # # # # #
 
     # Validate the category input
@@ -693,14 +709,15 @@ calc_prop_alters_singleans <- function(
     #   for attributes that may have only have one answer (such as "speak" and "length").
     #
     # Inputs:
-    #   df = A personal network data frame
-    #   categories  = `string` or `character vector` containing one or multiple categories from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
-    #   mapping     = `named double` corresponding labels (names) and values (numeric) for the attribute
-    #   attribute   = `string` attribute in which categories can be found (e.g. "relat")
+    #   df         = A personal network data frame
+    #   categories = `string` or `character vector` containing one or multiple categories 
+    #       from which to calcluate proportion (e.g., c("Monthly", "Less often") OR "Monthly")
+    #   mapping    = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   attribute  = `string` attribute in which categories can be found (e.g. "relat")
     # Outputs:
     #   `double` Proportions of alters that have the category/one of the categories in `categories`.
     #   Returns all NAs if cannot find columns related to `attribute`
-    #   Any isolate columns are scored as NA rather than 0.
+    #   Any isolate rows are scored as NA rather than 0.
     # # # # # # # #
 
     # Validate the category input
@@ -732,8 +749,8 @@ calc_prop_alters_singleans <- function(
         # Convert all but those in the category to NA and compute the sum of each row.
         # Divide by number of alters
         # NOTE: unlisting allows for mappings to be lists or numeric vectors
-        # Without unlisting, `mapping`s that are lists need [[, 
-        # which errors if `categories` has more than one value. 
+        # Without unlisting, `mapping`s that are lists need [[,
+        # which errors if `categories` has more than one value.
         # Unlisting ensures everything works as expected
         props <- selected_cols %>%
             mutate(across(
