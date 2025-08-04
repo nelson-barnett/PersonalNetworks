@@ -41,7 +41,7 @@ rm(list = ls())
 
 ### Locate data
 data_file <- "fake_data.csv"
-dict_file <- "data_dict.csv"
+dict_file <- "codebook.csv"
 
 out_dir <- ""
 out_suffix <- as.character(Sys.Date())
@@ -82,29 +82,85 @@ age = df_input$age
 
 ### sex
 sex_map <- get_codebook_mapping(df_dict, "sex")
-sex <- names(sex_map[df_input$sex])
+sex <- factor(df_input$sex, levels = sex_map, labels = names(sex_map))
 
 ### race
-# purrr applies the same function to a list, in this case, each row of df_input
-# the blank space between .x, , is selecting all columns of df_input
-# while drop= FALSE forces R to return not a vector but a dataframe object
 race_map <- get_codebook_mapping(df_dict, "race")
 ego_races <- extract_ego_multi_attributes(df_input, "race", race_map)
 
 ### Employment
 employ_map <- get_codebook_mapping(df_dict, "employment")
-ego_employ <- extract_ego_multi_attributes(df_input, "employment", employ_map)
+employment <- factor(
+    df_input$employment,
+    levels = employ_map,
+    labels = names(employ_map)
+)
 
 ### Education
-edu_map <- get_codebook_mapping(df_dict, "education")
-education <- names(edu_map[df_input$education])
+edu_map <- get_codebook_mapping(df_dict, "edu")
+education <- factor(df_input$edu, levels = edu_map, labels = names(edu_map))
 
 ### Zip
 zip = as.character(df_input$zip)
 
+### Occupation
+occ_map <- get_codebook_mapping(df_dict, "occupation")
+occupation <- factor(
+    df_input$occupation,
+    levels = occ_map,
+    labels = names(occ_map)
+)
+
+### Income
+income_map <- get_codebook_mapping(df_dict, "income")
+income <- factor(
+    df_input$income,
+    levels = income_map,
+    labels = names(income_map)
+)
+
+### Married
+marry_map <- get_codebook_mapping(df_dict, "married")
+married <- factor(
+    df_input$married,
+    levels = marry_map,
+    labels = names(marry_map)
+)
+
+## Live_alone
+live_map <- get_codebook_mapping(df_dict, "live_alone")
+live_alone <- factor(
+    df_input$live_alone,
+    levels = live_map,
+    labels = names(live_map)
+)
+
+### household_number
+household_number <- df_input$household_number
+
 ### Smoking
 smoke_map <- get_codebook_mapping(df_dict, "smoke")
-smoke <- names(smoke_map[df_input$smoke])
+smoke <- factor(df_input$smoke, levels = smoke_map, labels = names(smoke_map))
+
+### Alcohol
+alc_map <- get_codebook_mapping(df_dict, "alcohol")
+alcohol <- factor(df_input$alcohol, levels = alc_map, labels = names(alc_map))
+
+### Exercise
+exercise_map <- get_codebook_mapping(df_dict, "exercise")
+exercise <- factor(
+    df_input$exercise,
+    levels = exercise_map,
+    labels = names(exercise_map)
+)
+
+### Diet
+diet_map <- get_codebook_mapping(df_dict, "diet")
+diet <- factor(df_input$diet, levels = diet_map, labels = names(diet_map))
+
+### Health probs
+health_map <- get_codebook_mapping(df_dict, "health")
+ego_health_probs <- extract_ego_multi_attributes(df_input, "health", health_map)
 
 ################# Network Stats #################
 network_size = calc_total_alters_df(df_input)
@@ -130,6 +186,9 @@ educ_map <- list(
     dont_know = 99
 )
 iqv_educ <- calc_attribute_iqv(df_input, "educ", educ_map)
+
+race_map <- get_codebook_mapping(df_dict, "name1race")
+iqv_race <- calc_attribute_iqv(df_input, "race", race_map)
 
 ################# Proportions #################
 prop_q1_in_network <- prop_of_qnames_in_network(df_input, 1)
@@ -169,54 +228,106 @@ far_dist_prop <- calc_prop_alters_singleans(
     "dist"
 )
 
-als_map <- get_codebook_mapping(df_dict, "name1als")
-met_through_als_prop <- calc_prop_alters_singleans(
+alc_map <- get_codebook_mapping(df_dict, "name1alcohol")
+heavy_drinkers_prop <- calc_prop_alters_singleans(
     df_input,
-    "Yes",
-    als_map,
-    "als"
+    c("Yes", "No"),
+    alc_map,
+    "alcohol"
 )
+
+smoke_map <- get_codebook_mapping(df_dict, "name1smoke")
+smoking_prop <- calc_prop_alters_singleans(
+    df_input,
+    c("Yes", "No"),
+    smoke_map,
+    "smoke"
+)
+
+exer_map <- get_codebook_mapping(df_dict, "name1exer")
+no_exercise_prop <- calc_prop_alters_singleans(
+    df_input,
+    "No",
+    exer_map,
+    "exer"
+)
+
+diet_map <- get_codebook_mapping(df_dict, "name1diet")
+bad_diet_prop <- calc_prop_alters_singleans(
+    df_input,
+    "No",
+    diet_map,
+    "diet"
+)
+
+health_map <- get_codebook_mapping(df_dict, "name1health")
+health_prob_prop <- calc_prop_alters_multians(
+    df_input,
+    names(health_map[health_map != 0 & health_map != 99]),
+    health_map,
+    "health"
+)
+
 
 ################# Blau #################
 blau_gender <- calc_blau_alter_heterophily(df_input, "sex", gender_map)
-blau_edu <- calc_blau_alter_heterophily(df_input, "educ", educ_map)
+blau_educ <- calc_blau_alter_heterophily(df_input, "educ", educ_map)
 blau_dist <- calc_blau_alter_heterophily(df_input, "dist", dist_map)
-blau_length <- calc_blau_alter_heterophily(df_input, "length", length_map)
 blau_speak <- calc_blau_alter_heterophily(df_input, "speak", speak_map)
+
+length_map <- get_codebook_mapping(df_dict, "name1length")
+blau_length <- calc_blau_alter_heterophily(df_input, "length", length_map)
 
 ############# MAKE OUTPUTS #############
 ############### Data Table ###############
-df_clean = tibble::tibble(
+my_df_clean = tibble::tibble(
     record_id = record_id,
     age = age,
     sex = sex,
     race1 = sapply(ego_races, "[", 1),
     race2 = sapply(ego_races, "[", 2),
-    education = education,
-    employment = sapply(ego_employ, "[", 1),
     zip = zip,
+    education = education,
+    employment = employment,
+    occupation = occupation,
+    income = income,
+    married = married,
+    live_alone = live_alone,
+    household_number = household_number,
+    ego_alcohol = alcohol,
+    ego_smoke = smoke,
+    ego_exercise = exercise,
+    ego_healthy_diet = diet,
+    health_problems1 = sapply(ego_health_probs, "[", 1),
+    health_problems2 = sapply(ego_health_probs, "[", 2),
+    health_problems3 = sapply(ego_health_probs, "[", 3),
+    health_problems4 = sapply(ego_health_probs, "[", 4),
     network_size = network_size,
     density = density,
     constraint = constraint,
     effsize = effsize,
     max_degree = max_degree,
     mean_degree = mean_degree,
-    kin_prop = kin_prop,
-    prop_q1 = prop_q1_in_network,
-    prop_q2 = prop_q2_in_network,
-    prop_q3 = prop_q3_in_network,
-    prop_through_als = met_through_als_prop,
-    age_sd = age_sd,
+    kin_prop = round(kin_prop, digits = 2),
+    age_sd = round(age_sd, digits = 2),
     IQV_sex = round(iqv_sex, digits = 2),
     IQV_educ = round(iqv_educ, digits = 2),
-    weak_freq_prop = weak_freq_prop,
-    weak_dur_prop = weak_dur_prop,
-    far_dist_prop = far_dist_prop,
+    weak_freq_prop = round(weak_freq_prop, digits = 2),
+    weak_dur_prop = round(weak_dur_prop, digits = 2),
+    far_dist_prop = round(far_dist_prop, digits = 2),
+    heavy_drinkers_prop = round(heavy_drinkers_prop, digits = 2),
+    smoking_prop = round(smoking_prop, digits = 2),
+    no_exercise_prop = round(no_exercise_prop, digits = 2),
+    bad_diet_prop = round(bad_diet_prop, digits = 2),
+    health_prob_prop = round(health_prob_prop, digits = 2),
     blau_gender = round(blau_gender, digits = 2),
     blau_educ = round(blau_educ, digits = 2),
-    blau_distance = round(blau_distance, digits = 2),
+    blau_distance = round(blau_dist, digits = 2),
     blau_length = round(blau_length, digits = 2),
-    blau_speak = round(blau_speak, digits = 2)
+    blau_speak = round(blau_speak, digits = 2),
+    prop_q1 = prop_q1_in_network,
+    prop_q2 = prop_q2_in_network,
+    prop_q3 = prop_q3_in_network
 )
 
 df_clean$zip <- as.character(df_clean$zip) #double check zip as string
