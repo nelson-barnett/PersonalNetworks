@@ -126,10 +126,14 @@ n_alters <- function(df) {
     # Outputs: `double vector` the number of alters of each participant (row) in the input df
     # # # # # # # #
 
+    # return(
+    #     df %>%
+    #         dplyr::select(name_1:name_15) %>%
+    #         rowSums()
+    # )
+
     return(
-        df %>%
-            dplyr::select(name_1:name_15) %>%
-            rowSums()
+        df %>% dplyr::select(tie1:tie15) %>% sign() %>% rowSums(na.rm = TRUE)
     )
 }
 
@@ -621,7 +625,7 @@ calc_attribute_iqv <- function(
             attribute,
             mapping
         ) /
-            (1 - (1 / length(mapping))),
+            (1 - (1 / length(mapping)))
     )
 }
 
@@ -638,7 +642,7 @@ calc_prop_alters_multians <- function(
     #
     # Inputs:
     #   df         = A personal network data frame
-    #   categories = `string` or `character vector` containing one or multiple categories 
+    #   categories = `string` or `character vector` containing one or multiple categories
     #       from which to calcluate proportion (e.g., c("Friend", "Family") OR "Friend")
     #   mapping    = `named double` corresponding labels (names) and values (numeric) for the attribute
     #   attribute  = `string` attribute in which categories can be found (e.g. "relat")
@@ -710,7 +714,7 @@ calc_prop_alters_singleans <- function(
     #
     # Inputs:
     #   df         = A personal network data frame
-    #   categories = `string` or `character vector` containing one or multiple categories 
+    #   categories = `string` or `character vector` containing one or multiple categories
     #       from which to calcluate proportion (e.g., c("Monthly", "Less often") OR "Monthly")
     #   mapping    = `named double` corresponding labels (names) and values (numeric) for the attribute
     #   attribute  = `string` attribute in which categories can be found (e.g. "relat")

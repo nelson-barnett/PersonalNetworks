@@ -1,6 +1,11 @@
 ##### Helpful utility functions
 
-get_codebook_mapping <- function(df, field_name, kv_split = ",", options_split = "|") {
+get_codebook_mapping <- function(
+    df,
+    field_name,
+    kv_split = ",",
+    options_split = "|"
+) {
     # # # # # # # #
     # Function: Extracts labels and values from redcap codebook
     # Inputs:
@@ -23,9 +28,10 @@ get_codebook_mapping <- function(df, field_name, kv_split = ",", options_split =
         # REDCap standard is to separate options with | and keys/values with ,
         items_list <- this_row %>%
             dplyr::pull(Choices..Calculations..OR.Slider.Labels) %>%
-            strsplit(, split = options_split, fixed = TRUE) %>%
+            strsplit(split = options_split, fixed = TRUE) %>%
             unlist() %>%
-            strsplit(split = kv_split, fixed = TRUE) %>%
+            # split at only the first instance of `kv_split`
+            regmatches(regexpr(kv_split, .), invert = TRUE) %>%
             lapply(trimws)
 
         # Separate keys and values
@@ -38,14 +44,14 @@ get_codebook_mapping <- function(df, field_name, kv_split = ",", options_split =
 names_to_relat <- function(df, mapping) {
     # # # # # # # #
     # Function: Returns a new dataframe with the names replaced by unique relationship labels
-    # Inputs: 
+    # Inputs:
     #   df = persnet `dataframe`
     #   mapping = `named double` with relationship labels as names and integers as values (typically from get_codebook_mapping)
-    # Outputs: 
-    #   `dataframe` the original dataframe with alter names replaced by their relationship label. 
+    # Outputs:
+    #   `dataframe` the original dataframe with alter names replaced by their relationship label.
     #   If there are multiple relationships for the same alter, the first one is used.
     # # # # # # # #
-   
+
     F <- function(persnet_row) {
         # Go through each "nameNUM" column
         for (i in 1:15) {
