@@ -82,8 +82,6 @@ organize_row_to_tidygraph <- function(df_row_input) {
                 record_id = df_row_input$record_id, # Add record ID
                 node_id = dplyr::row_number()
             ) # Create a unique node ID
-
-        return(tgra)
     } else {
         # if no edges exist, create an isolate
         tgra <- tidygraph::tbl_graph(
@@ -94,9 +92,8 @@ organize_row_to_tidygraph <- function(df_row_input) {
                 record_id = df_row_input$record_id,
                 node_id = dplyr::row_number()
             )
-
-        return(tgra)
     }
+    return(tgra)
 }
 
 organize_list_tidygraphs <- function(persnet_df) {
@@ -119,21 +116,48 @@ organize_list_tidygraphs <- function(persnet_df) {
 }
 
 
-n_alters <- function(df) {
+find_isolates <- function(df) {
+    return(df %>% select(tie1:tie15) %>% rowSums(na.rm = TRUE) == 0)
+}
+
+n_alters_with_data <- function(df) {
     # # # # # # # #
-    # Function: Counts the number of alters in a network
+    # Function: Counts the number of alters in a network (max capped at 10 by survey design)
     # Inputs: df = Persnet dataframe
     # Outputs: `double vector` the number of alters of each participant (row) in the input df
     # # # # # # # #
 
-    # return(
-    #     df %>%
-    #         dplyr::select(name_1:name_15) %>%
-    #         rowSums()
-    # )
-
     return(
         df %>% dplyr::select(tie1:tie15) %>% sign() %>% rowSums(na.rm = TRUE)
+    )
+}
+
+n_unique_alters <- function(df, use_more_names = FALSE) {
+    # Will always need this
+    col_match <- sprintf("^name%s$", 1:15)
+
+    if (use_more_names) {
+        # Add more names if requested
+        col_match <- c(col_match, sprintf("^more_names_%s$", 1:3))
+    }
+
+    return(
+        df %>%
+            tidyr::unite(
+                combined_names,
+                dplyr::matches(col_match),
+                sep = ",",
+                na.rm = TRUE
+            ) %>% # combine everything using ","
+            pull(combined_names) %>% # only care about combined column
+            gsub("\\s*", "", .) %>% # remove any whitespace
+            tolower() %>% # lower so "bob" and "Bob" match
+            stringr::str_split(",") %>% # split on "," (same: regmatches(., gregexpr("(?<=,).*?(?=,)", ., perl = TRUE)))
+            lapply(\(x) {
+                # select unique, non-empty values
+                unique(x[x != ""])
+            }) %>%
+            lengths() # count 'em
     )
 }
 
@@ -157,7 +181,7 @@ extract_ego_multi_attributes <- function(
     # Get all the columns for this attribute
     # rename the columns to their mapping name (number after underscores is the value whose name to extract)
     attr_cols <- df %>%
-        dplyr::select(dplyr::matches(sprintf("^%s_*\\d+$", attribute))) %>%
+        dplyr::select(dplyr::matches(sprintf("^%s_+\\d+$", attribute))) %>%
         dplyr::rename_with(~ names(mapping[grep("_(.*)", .x)]))
 
     # For every row, get the names of all columns containing a 1
@@ -191,74 +215,7 @@ prop_of_qnames_in_network <- function(df, q_num, names_per_q = 5) {
                 start_name_num:end_name_num
             ))) %>%
             rowSums() /
-            n_alters(df)
-    )
-}
-
-calc_total_alters_row <- function(persnet_row) {
-    ########## NOTE: This has more_names column too, which doesn't align with the graphed network
-
-    # # # # # # # #
-    # Function: Computes the total number of unique alters in a given
-    #           personal network row, combining named alters and additional
-    #           names listed in "more_names" columns.
-    # Inputs:
-    #   persnet_row = A single row of a personal network data frame
-    # Outputs:
-    #   Total count of unique alters in the network
-    # # # # # # # #
-
-    # check if inout is valid
-    if (is.null(persnet_row) || !"data.frame" %in% class(persnet_row)) {
-        stop("The input must be a single row of a personal network dataframe.")
-    }
-
-    # Convert the row into a tidygraph object
-    tc_tidygraph <- organize_row_to_tidygraph(persnet_row)
-
-    # Extract unique alter names from the tidygraph, excluding the ego node
-    unique_names_tidygra <- tc_tidygraph %>%
-        tidygraph::activate(nodes) %>%
-        dplyr::as_tibble() %>%
-        dplyr::filter(name != "ego") %>%
-        dplyr::pull(name) %>%
-        unique()
-
-    # Extract and clean additional alter names from "more_names" columns
-    all_more_names <- paste(
-        persnet_row$more_names_1,
-        persnet_row$more_names_2,
-        persnet_row$more_names_3,
-        sep = ", "
-    ) %>%
-        stringr::str_split(",\\s*") %>% # split by commas
-        unlist() %>% # conver to vector
-        .[. != ""] %>% # semove empty strings
-        unique()
-
-    # Return the count of unique alters from both sources
-    return(length(union(unique_names_tidygra, all_more_names)))
-}
-
-calc_total_alters_df <- function(persnet_df) {
-    # applies total alters row to each dataframe
-    tryCatch(
-        {
-            # apply to each row the function of calculate total alters
-            vector_count_total_alters <- apply(persnet_df, 1, function(row) {
-                calc_total_alters_row(
-                    persnet_df %>% dplyr::filter(record_id == row["record_id"])
-                )
-            })
-            return(vector_count_total_alters)
-        },
-        error = function(e) {
-            # If an error occurs, stop with a message indicating that the input is not a valid persnet dataframe
-            warning(
-                " error: there was an error calculating number of unqiue alters, returning NA"
-            )
-            return(NA)
-        }
+            n_unique_alters(df, use_more_names = FALSE)
     )
 }
 
@@ -266,7 +223,7 @@ calc_total_alters_df <- function(persnet_df) {
 
 ########################### Network Density ###################################
 
-calc_egoless_density <- function(tg_graph) {
+egoless_density <- function(tg_graph) {
     # # # # # # # #
     # Function: Computes the density of a personal network graph after
     #           removing the ego node.
@@ -279,13 +236,13 @@ calc_egoless_density <- function(tg_graph) {
     return(round(igraph::edge_density(remove_ego_from_igraph(tg_graph)), 2))
 }
 
-calc_egoless_density_df <- function(persnet_df) {
+egoless_density_df <- function(persnet_df) {
     tryCatch(
         {
             # Organize a list of tidygraphs from the persnet dataframe
             gra_list <- organize_list_tidygraphs(persnet_df)
             # Calculate the density of each network after removing the ego node
-            vector_egoless_density <- sapply(gra_list, calc_egoless_density)
+            vector_egoless_density <- sapply(gra_list, egoless_density)
             return(vector_egoless_density)
         },
         error = function(e) {
@@ -297,7 +254,7 @@ calc_egoless_density_df <- function(persnet_df) {
 
 ######################### Network Constraint ##################################
 
-calc_node_constraint <- function(tidygra, node_index = NULL) {
+node_constraint <- function(tidygra, node_index = NULL) {
     # # # # # # # #
     # Function: Computes Burt's Constraint measure for a specified node
     #           in a tidygraph object, quantifying structural holes.
@@ -381,7 +338,7 @@ calc_node_constraint <- function(tidygra, node_index = NULL) {
 
 ######################### Effective Network Size ##############################
 
-calc_node_ens <- function(tidygra, node_index = NULL) {
+node_ens <- function(tidygra, node_index = NULL) {
     # # # # # # # #
     # Function: Computes the Effective Network Size (ENS) for a specified node
     #           in a tidygraph object, considering tie strengths.
@@ -476,7 +433,7 @@ calc_node_ens <- function(tidygra, node_index = NULL) {
 
 ############################ Mean Degree ######################################
 
-calc_egoless_mean_degree <- function(tg_graph) {
+egoless_mean_degree <- function(tg_graph) {
     # # # # # # # #
     # Function: Computes the mean degree of nodes in a personal
     #           network after removing the ego node.
@@ -508,7 +465,7 @@ calc_egoless_mean_degree <- function(tg_graph) {
 
 ########################## Max Degree #########################################
 
-calc_egoless_max_degree <- function(tg_graph) {
+egoless_max_degree <- function(tg_graph) {
     # # # # # # # #
     # Function: Computes the maximum degree of nodes in a personal
     #           network after removing the ego node.
@@ -543,7 +500,7 @@ calc_egoless_max_degree <- function(tg_graph) {
 
 ########################### Age Standard Deviation ############################
 
-calc_numeric_attr_sd <- function(df, attribute) {
+numeric_attr_sd <- function(df, attribute) {
     # # # # # # # #
     # Function: Calculates the standard deviation of alters' given numeric attribute (such as "age")
     #   CAUTION: Make sure the attribute makes sense. SD of "sex" would not be a meaningful result.
@@ -570,7 +527,7 @@ calc_numeric_attr_sd <- function(df, attribute) {
 
 ####################### Diversity Calculation Functions #######################
 
-calc_blau_alter_heterophily <- function(
+blau_alter_heterophily <- function(
     df,
     attribute,
     mapping
@@ -588,12 +545,12 @@ calc_blau_alter_heterophily <- function(
 
     # Blau heterophily assumes mutually exclusive categories, so only use 'singleans'
 
-    # Apply calc_prop_alters_singleans to all names in mapping, returning a nested list,
+    # Apply prop_alters_singleans to all names in mapping, returning a nested list,
     # create a df from the nested list, then get the proportion
     return(
         1 -
             (purrr::map(names(mapping), \(category) {
-                calc_prop_alters_singleans(df, category, mapping, attribute)^2
+                prop_alters_singleans(df, category, mapping, attribute)^2
             }) %>%
                 dplyr::bind_cols(.name_repair = "unique_quiet") %>%
                 rowSums())
@@ -601,35 +558,55 @@ calc_blau_alter_heterophily <- function(
 }
 
 
-calc_attribute_iqv <- function(
+attribute_iqv <- function(
     df,
     attribute,
-    mapping
+    mapping,
+    normalize_by
 ) {
     # # # # # # # #
     # Function: Computes the Index of Qualitative Variation (IQV) for a specified
     #           alter attribute. The IQV measures diversity and variation within
     #           a personal network.
     # Inputs:
-    #   df        = A personal network data frame
-    #   attribute = `string` attribute on which to calculate metric
-    #   mapping   = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   df           = A personal network data frame
+    #   attribute    = `string` attribute on which to calculate metric
+    #   mapping      = `named double` corresponding labels (names) and values (numeric) for the attribute
+    #   normalize_by = `string` that must be either "mapping" or "data".
+    #                        "mapping" normalizes Blau by 1 - (1 / length(mapping))
+    #                        "data" normalizes Blau by 1 - (1 / number of unique values in attribute columns of `df`)
     # Outputs:
     #   IQV value for the specified attribute
     # # # # # # # #
 
+    # Get denominator value as requested by the argument
+    denom <- switch(
+        normalize_by,
+        "mapping" = 1 - (1 / length(mapping)),
+        "data" = 1 -
+            (1 /
+                df %>%
+                    dplyr::select(dplyr::matches(sprintf(
+                        "^name%s%s$",
+                        1:15,
+                        attribute
+                    ))) %>%
+                    unlist() %>%
+                    n_distinct(na.rm = TRUE))
+    )
+
     # calculate IQV using Blau heterophily index and corresponding normalization factor
     return(
-        calc_blau_alter_heterophily(
+        blau_alter_heterophily(
             df,
             attribute,
             mapping
         ) /
-            (1 - (1 / length(mapping)))
+            denom
     )
 }
 
-calc_prop_alters_multians <- function(
+prop_alters_multians <- function(
     df,
     categories,
     mapping,
@@ -667,7 +644,7 @@ calc_prop_alters_multians <- function(
         ~ dplyr::select(
             df,
             dplyr::matches(sprintf(
-                "^name%s%s_*%s$",
+                "^name%s%s_+%s$",
                 1:15,
                 attribute,
                 mapping[[.]]
@@ -689,12 +666,13 @@ calc_prop_alters_multians <- function(
         return(rep(NA, nrow(df)))
     } else {
         # Convert row to a tidygraph object and check if the network is an isolate
-        isolate_rows <- df %>%
-            organize_list_tidygraphs() %>%
-            sapply(igraph::vcount) ==
-            1
+        isolate_rows <- find_isolates(df)
+        # isolate_rows <- df %>%
+        #     organize_list_tidygraphs() %>%
+        #     sapply(igraph::vcount) ==
+        #     1
         # Calculate proportions for each row
-        props <- rowSums(relevant_cols) / n_alters(df)
+        props <- rowSums(relevant_cols) / n_alters_with_data(df)
         # Set to NA instead of 0 if row is an isolate
         props[isolate_rows] <- NA
         # Unname on return for consistency (single row input returns a `Named num`, multirow does not name)
@@ -702,7 +680,7 @@ calc_prop_alters_multians <- function(
     }
 }
 
-calc_prop_alters_singleans <- function(
+prop_alters_singleans <- function(
     df,
     categories,
     mapping,
@@ -746,10 +724,11 @@ calc_prop_alters_singleans <- function(
         return(rep(NA, nrow(df)))
     } else {
         # Convert row to a tidygraph object and check if the network is an isolate
-        isolate_rows <- df %>%
-            organize_list_tidygraphs() %>%
-            sapply(igraph::vcount) ==
-            1
+        isolate_rows <- find_isolates(df)
+        # isolate_rows <- df %>%
+        #     organize_list_tidygraphs() %>%
+        #     sapply(igraph::vcount) ==
+        #     1
         # Convert all but those in the category to NA and compute the sum of each row.
         # Divide by number of alters
         # NOTE: unlisting allows for mappings to be lists or numeric vectors
@@ -762,10 +741,84 @@ calc_prop_alters_singleans <- function(
                 ~ ifelse(.x %in% unlist(mapping[categories]), 1, NA)
             )) %>%
             rowSums(na.rm = TRUE) /
-            n_alters(df)
+            n_alters_with_data(df)
         # Set all isolate rows to NA
         props[isolate_rows] <- NA
         # Unname on return for consistency (single row input returns a `Named num`, multirow does not name)
         return(unname(props))
     }
+}
+
+prop_alters_multians_priority <- function(
+    df,
+    categories_list,
+    mapping,
+    attribute
+) {
+    # Motivating example: An alter may be listed as both "family" and "friend"
+    # If interested in the proportion of c("family", "spouse") OR "friend" only, this doesn't pose an issue.
+    # If interested in calculating BOTH proportion "family" and proportion "friend", the sum will be > 1
+    # This function solves the above situation by calculating the proportions in the order provided
+    # and not double counting an alter. For example, if "family" is higher priority than "friend",
+    # pass, `categories_list` = list("family", "friend").
+    # Cannot pass a list with the same category multiple times, as each category is dropped after it's used.
+
+    # Input validation: cannot have the same category multiple times
+    if (
+        sum(lengths(categories_list)) != length(unique(unlist(categories_list)))
+    ) {
+        stop("Cannot have any repeated categories")
+    }
+
+    # preallocate
+    out <- vector(mode = "list", length = length(categories_list))
+
+    # Loop over all categories
+    for (i in seq_along(categories_list)) {
+        # Set var for ease of use
+        categories <- categories_list[[i]]
+
+        # Get the proportion
+        out[[i]] <- prop_alters_multians(df, categories, mapping, attribute)
+
+        ### CLEAN: Set used names to 0
+        # Extract the columns that were used
+        relevant_cols <- purrr::map(
+            categories,
+            ~ dplyr::select(
+                df,
+                dplyr::matches(sprintf(
+                    "^name%s%s_+%s$",
+                    1:15,
+                    attribute,
+                    mapping[[.]]
+                ))
+            ) %>%
+                # This may not be necessary, but it's nice:
+                # remove tail of column name so that all df columns have the same name
+                dplyr::rename_with(~ gsub("_(.*)", "", .x))
+        ) %>%
+            # If alter has 1 in any column, set to TRUE, otherwise FALSE
+            purrr::reduce(`|`)
+
+        # Get row, col indices for all names that were found
+        inds <- which(relevant_cols == 1, arr.ind = TRUE)
+
+        # For each row, set flagged alters to 0
+        for (x in unique(inds[, "row"])) {
+            df[x, ] <- df %>%
+                slice(x) %>%
+                mutate(across(
+                    matches(paste(
+                        colnames(relevant_cols)[inds[
+                            inds[, "row"] == x,
+                            "col"
+                        ]],
+                        collapse = "_+\\d+$|"
+                    )),
+                    ~0
+                ))
+        }
+    }
+    return(out)
 }

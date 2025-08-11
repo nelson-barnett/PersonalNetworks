@@ -163,21 +163,26 @@ health_map <- get_codebook_mapping(df_dict, "health")
 ego_health_probs <- extract_ego_multi_attributes(df_input, "health", health_map)
 
 ################# Network Stats #################
-network_size = calc_total_alters_df(df_input)
-density = calc_egoless_density_df(df_input)
+network_size = total_alters_df(df_input)
+density = egoless_density_df(df_input)
 
 gra_list <- organize_list_tidygraphs(df_input)
-constraint = sapply(gra_list, calc_node_constraint)
-effsize = sapply(gra_list, calc_node_ens)
-mean_degree = sapply(gra_list, calc_egoless_mean_degree)
-max_degree = sapply(gra_list, calc_egoless_max_degree)
+constraint = sapply(gra_list, node_constraint)
+effsize = sapply(gra_list, node_ens)
+mean_degree = sapply(gra_list, egoless_mean_degree)
+max_degree = sapply(gra_list, egoless_max_degree)
 
 ############### ALTERS ###############
-age_sd <- calc_numeric_attr_sd(df_input, "age")
+age_sd <- numeric_attr_sd(df_input, "age")
 
 ################# IQV #################
 gender_map <- get_codebook_mapping(df_dict, "name1sex")
-iqv_sex <- calc_attribute_iqv(df_input, "sex", gender_map)
+iqv_sex <- attribute_iqv(
+    df_input,
+    "sex",
+    gender_map,
+    normalize_by = "mapping"
+)
 
 educ_map <- list(
     only_high_school = c(1, 2),
@@ -185,10 +190,20 @@ educ_map <- list(
     college_grad = c(5, 6),
     dont_know = 99
 )
-iqv_educ <- calc_attribute_iqv(df_input, "educ", educ_map)
+iqv_educ <- attribute_iqv(
+    df_input,
+    "educ",
+    educ_map,
+    normalize_by = "mapping"
+)
 
 race_map <- get_codebook_mapping(df_dict, "name1race")
-iqv_race <- calc_attribute_iqv(df_input, "race", race_map)
+iqv_race <- attribute_iqv(
+    df_input,
+    "race",
+    race_map,
+    normalize_by = "mapping"
+)
 
 ################# Proportions #################
 prop_q1_in_network <- prop_of_qnames_in_network(df_input, 1)
@@ -197,7 +212,7 @@ prop_q3_in_network <- prop_of_qnames_in_network(df_input, 3)
 
 # All mappings will be the same, so just take the first one
 relat_map <- get_codebook_mapping(df_dict, "name1relat")
-kin_prop <- calc_prop_alters_multians(
+kin_prop <- prop_alters_multians(
     df_input,
     c("Spouse", "Family"),
     relat_map,
@@ -205,7 +220,7 @@ kin_prop <- calc_prop_alters_multians(
 )
 
 speak_map <- get_codebook_mapping(df_dict, "name1speak")
-weak_freq_prop <- calc_prop_alters_singleans(
+weak_freq_prop <- prop_alters_singleans(
     df_input,
     c("Monthly", "Less often"),
     speak_map,
@@ -213,7 +228,7 @@ weak_freq_prop <- calc_prop_alters_singleans(
 )
 
 len_map <- get_codebook_mapping(df_dict, "name1length")
-weak_dur_prop <- calc_prop_alters_singleans(
+weak_dur_prop <- prop_alters_singleans(
     df_input,
     c("Less than three", "Three to six"),
     len_map,
@@ -221,7 +236,7 @@ weak_dur_prop <- calc_prop_alters_singleans(
 )
 
 dist_map <- get_codebook_mapping(df_dict, "name1dist")
-far_dist_prop <- calc_prop_alters_singleans(
+far_dist_prop <- prop_alters_singleans(
     df_input,
     c("16-50 miles", "50+ miles"),
     dist_map,
@@ -229,7 +244,7 @@ far_dist_prop <- calc_prop_alters_singleans(
 )
 
 alc_map <- get_codebook_mapping(df_dict, "name1alcohol")
-heavy_drinkers_prop <- calc_prop_alters_singleans(
+heavy_drinkers_prop <- prop_alters_singleans(
     df_input,
     c("Yes", "No"),
     alc_map,
@@ -237,7 +252,7 @@ heavy_drinkers_prop <- calc_prop_alters_singleans(
 )
 
 smoke_map <- get_codebook_mapping(df_dict, "name1smoke")
-smoking_prop <- calc_prop_alters_singleans(
+smoking_prop <- prop_alters_singleans(
     df_input,
     c("Yes", "No"),
     smoke_map,
@@ -245,7 +260,7 @@ smoking_prop <- calc_prop_alters_singleans(
 )
 
 exer_map <- get_codebook_mapping(df_dict, "name1exer")
-no_exercise_prop <- calc_prop_alters_singleans(
+no_exercise_prop <- prop_alters_singleans(
     df_input,
     "No",
     exer_map,
@@ -253,7 +268,7 @@ no_exercise_prop <- calc_prop_alters_singleans(
 )
 
 diet_map <- get_codebook_mapping(df_dict, "name1diet")
-bad_diet_prop <- calc_prop_alters_singleans(
+bad_diet_prop <- prop_alters_singleans(
     df_input,
     "No",
     diet_map,
@@ -261,7 +276,7 @@ bad_diet_prop <- calc_prop_alters_singleans(
 )
 
 health_map <- get_codebook_mapping(df_dict, "name1health")
-health_prob_prop <- calc_prop_alters_multians(
+health_prob_prop <- prop_alters_multians(
     df_input,
     names(health_map[health_map != 0 & health_map != 99]),
     health_map,
@@ -270,13 +285,13 @@ health_prob_prop <- calc_prop_alters_multians(
 
 
 ################# Blau #################
-blau_gender <- calc_blau_alter_heterophily(df_input, "sex", gender_map)
-blau_educ <- calc_blau_alter_heterophily(df_input, "educ", educ_map)
-blau_dist <- calc_blau_alter_heterophily(df_input, "dist", dist_map)
-blau_speak <- calc_blau_alter_heterophily(df_input, "speak", speak_map)
+blau_gender <- blau_alter_heterophily(df_input, "sex", gender_map)
+blau_educ <- blau_alter_heterophily(df_input, "educ", educ_map)
+blau_dist <- blau_alter_heterophily(df_input, "dist", dist_map)
+blau_speak <- blau_alter_heterophily(df_input, "speak", speak_map)
 
 length_map <- get_codebook_mapping(df_dict, "name1length")
-blau_length <- calc_blau_alter_heterophily(df_input, "length", length_map)
+blau_length <- blau_alter_heterophily(df_input, "length", length_map)
 
 ############# MAKE OUTPUTS #############
 ############### Data Table ###############

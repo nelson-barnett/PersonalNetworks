@@ -58,7 +58,7 @@ names_to_relat <- function(df, mapping) {
             # Find corresponding nameNUMrelat___NUM columns
             relat_cols <- dplyr::select(
                 persnet_row,
-                dplyr::matches(sprintf("^name%srelat_*\\d+$", i))
+                dplyr::matches(sprintf("^name%srelat_+\\d+$", i))
             )
             if (!any(relat_cols)) {
                 next
@@ -100,5 +100,5 @@ names_to_relat <- function(df, mapping) {
     }
 
     # Apply the function to each row of df and reconstruct the table
-    return(df %>% rowwise() %>% summarize(F(across()))) #### TODO: Update F(across()) (depreciated now)
+    return(df %>% rowwise() %>% summarize(F(across(everything())))) #### TODO: Update F(across()) (depreciated now)
 }
