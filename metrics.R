@@ -132,13 +132,33 @@ n_alters_with_data <- function(df) {
     )
 }
 
-n_unique_alters <- function(df, use_more_names = FALSE) {
-    # Will always need this
-    col_match <- sprintf("^name%s$", 1:15)
+n_unique_alters <- function(
+    df,
+    q_num = NA,
+    names_per_q = NA,
+    use_more_names = TRUE
+) {
+    input_NAs <- is.na(c(q_num, names_per_q))
+    if (sum(input_NAs) == 1) {
+        stop("q_num and names_per_num must either both be integers or NA")
+    } else if (all(input_NAs)) {
+        # By default, use all of the questions and all of the names
+        start_name_num <- 1
+        end_name_num <- 15
+        more_names_num <- 1:3
+    } else {
+        # Get the bounding numbers (q_num = 2, names_per_q = 5 -> start at 6, end at 10)
+        end_name_num <- q_num * names_per_q
+        start_name_num <- end_name_num - names_per_q + 1
+        more_names_num <- q_num
+    }
 
+    # Will always need this
+    col_match <- sprintf("^name%s$", start_name_num:end_name_num)
+
+    # Add more names if requested
     if (use_more_names) {
-        # Add more names if requested
-        col_match <- c(col_match, sprintf("^more_names_%s$", 1:3))
+        col_match <- c(col_match, sprintf("^more_names_%s$", more_names_num))
     }
 
     return(
@@ -150,7 +170,7 @@ n_unique_alters <- function(df, use_more_names = FALSE) {
                 na.rm = TRUE
             ) %>% # combine everything using ","
             pull(combined_names) %>% # only care about combined column
-            gsub("\\s*", "", .) %>% # remove any whitespace
+            gsub("\\s+", "", .) %>% # remove any whitespace
             tolower() %>% # lower so "bob" and "Bob" match
             stringr::str_split(",") %>% # split on "," (same: regmatches(., gregexpr("(?<=,).*?(?=,)", ., perl = TRUE)))
             lapply(\(x) {
@@ -190,7 +210,12 @@ extract_ego_multi_attributes <- function(
     }))
 }
 
-prop_of_qnames_in_network <- function(df, q_num, names_per_q = 5) {
+prop_of_qnames_in_network <- function(
+    df,
+    q_num,
+    names_per_q = 5,
+    use_more_names = TRUE
+) {
     # # # # # # #
     # Function: Get the proportion of names in a network that came from a certain question
     #   Typically, there are multiple "name generating" questions for a persnet survey
@@ -199,23 +224,14 @@ prop_of_qnames_in_network <- function(df, q_num, names_per_q = 5) {
     #   df = Personal network dataframe
     #   q_num = `Integer` The question number.
     #   names_per_q = `Integer` The number of names captured per question. Default: 5.
+    #   use_more_names = `Boolean` Flag to count "more_names_" columns. Default: TRUE.
     # Outputs:
     #   `double vector` containing the proportion of names in a network from `q_num` for each participant (row of `df`)
     # # # # # # #
 
-    # Get the bounding numbers (q_num = 2, names_per_q = 5 -> start at 6, end at 10)
-    end_name_num <- q_num * names_per_q
-    start_name_num <- end_name_num - names_per_q + 1
-
-    # Rowsum the columns, divide by total number of alters to get proportion
     return(
-        df %>%
-            dplyr::select(dplyr::matches(sprintf(
-                "^name_%s$",
-                start_name_num:end_name_num
-            ))) %>%
-            rowSums() /
-            n_unique_alters(df, use_more_names = FALSE)
+        n_unique_alters(df, q_num, names_per_q, use_more_names) /
+            n_unique_alters(df, use_more_names = use_more_names)
     )
 }
 
