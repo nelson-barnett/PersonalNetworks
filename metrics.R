@@ -700,7 +700,8 @@ prop_alters_singleans <- function(
     df,
     categories,
     mapping,
-    attribute
+    attribute,
+    attribute_only_cols = FALSE
 ) {
     # # # # # # # #
     # Function: Computes the proportion of alters that have a given category or categories
@@ -727,9 +728,14 @@ prop_alters_singleans <- function(
         ))
     }
 
+    match_cols <- if (attribute_only_cols) {
+        sprintf("^%s%s$", attribute, 1:15)
+    } else {
+        sprintf("^name%s%s$", 1:15, attribute)
+    }
+
     # Select attribute columns of the proper form
-    selected_cols <- df %>%
-        dplyr::select(dplyr::matches(sprintf("^name%s%s$", 1:15, attribute)))
+    selected_cols <- dplyr::select(df, dplyr::matches(match_cols))
 
     # Calculate and return the proportion of alters within the specified category
     if (dim(selected_cols)[2] == 0) {

@@ -7,6 +7,8 @@
 #  You may need to change font family under theme_graph() to a font listed at this link
 #  https://stat.ethz.ch/R-manual/R-devel/library/grDevices/html/postscriptFonts.html
 
+source("metrics.R")
+
 plot_single_network_node_labels <- function(
     tidygra,
     ego_name = NULL,
@@ -125,7 +127,7 @@ plot_single_network_node_labels <- function(
             scale_color_identity() +
             scale_fill_identity() +
             ggtitle(ttl) +
-            theme_graph(base_family = "Helvetica-Narrow") + 
+            theme_graph(base_family = "Helvetica-Narrow") +
             scale_x_continuous(expand = expansion(.15)) +
             scale_y_continuous(expand = expansion(.25))
 
@@ -144,7 +146,11 @@ plot_single_network_node_labels <- function(
             scale_edge_color_manual(
                 values = c("weak" = weak_color, "strong" = strong_color)
             ) +
-            geom_node_point(size = node_size, color = 'grey66', show.legend = FALSE) +
+            geom_node_point(
+                size = node_size,
+                color = 'grey66',
+                show.legend = FALSE
+            ) +
             geom_node_label(
                 aes(label = name, fill = node_fill, color = node_text_color),
                 size = node_size,
@@ -173,7 +179,7 @@ plot_single_network <- function(
     # # # # # # # #
     # Function: Plots a personal network graph using ggraph, distinguishing
     #           between strong and weak ties and highlighting the ego node.
-    # Inputs: 
+    # Inputs:
     #   tidygra      = A tidygraph object representing a personal network
     #   edge_size    = Numeric width of the edges. Default: 0.5
     #   node_size    = Numeric size of the nodes. Default: 2
@@ -265,4 +271,106 @@ plot_single_network <- function(
             return(tg_plot)
         }
     }
+}
+
+plot_prop_singleans_piechart <- function(
+    df,
+    mapping,
+    attribute,
+    attribute_only_cols,
+    key_name,
+    palette = "Dark2"
+) {
+    p_names <- sprintf("Participant %s", 1:nrow(df))
+    n_alters <- n_alters_with_data(df)
+
+    # Get proportions for every mapping value
+    props <- purrr::map(names(mapping), \(category) {
+        prop_alters_singleans(
+            df,
+            category,
+            mapping,
+            attribute,
+            attribute_only_cols
+        )
+    }) %>%
+        setNames(names(mapping)) %>%
+        dplyr::bind_cols() %>%
+        t() %>%
+        as.data.frame() %>%
+        setNames(p_names) %>%
+        tibble::rownames_to_column(key_name)
+
+    # Make piechart
+    return(lapply(
+        1:length(p_names),
+        \(column) {
+            ggplot(
+                props,
+                aes(
+                    x = "",
+                    y = !!sym(p_names[column]),
+                    fill = !!ensym(key_name)
+                )
+            ) +
+                geom_bar(stat = "identity", width = 1, color = "white") +
+                coord_polar("y", start = 0) +
+                scale_fill_brewer(palette = palette) +
+                theme_void() +
+                ggtitle(paste(p_names[column], "-- n:", n_alters[column]))
+        }
+    ))
+}
+
+plot_prop_multians_piecharts <- function(df, mapping, attribute, key_name) {
+    p_names <- sprintf("Participant %s", 1:nrow(df))
+    n_alters <- n_alters_with_data(df)
+
+    # For each alter
+    out_list <- vector(mode = "list", length = 15)
+    for (alter_num in 1:15) {
+        # Get all of the answers for this attribute
+        m <- df %>%
+            select(matches(sprintf("^name%s%s_+\\d+$", alter_num, attribute))) %>%
+            dplyr::rename_with(
+                ~ names(mapping[mapping == as.integer(gsub("(.*_+)", "", .x))])
+            )
+        # Get proportion and adjust table
+        m <- (m / rowSums(m, na.rm = TRUE)) %>%
+            t() %>%
+            as.data.frame() %>%
+            setNames(p_names) %>%
+            tibble::rownames_to_column(key_name)
+
+        # Make piechart
+        out_list[[alter_num]] <- lapply(
+            1:length(p_names),
+            \(column) {
+                ggplot(
+                    m,
+                    aes(
+                        x = "",
+                        y = !!sym(p_names[column]),
+                        fill = !!ensym(key_name)
+                    )
+                ) +
+                    geom_bar(
+                        stat = "identity",
+                        width = 1,
+                        color = "white"
+                    ) +
+                    coord_polar("y", start = 0) +
+                    scale_fill_brewer(palette = palette) +
+                    theme_void() +
+                    ggtitle(paste(
+                        p_names[column],
+                        "-- n:",
+                        n_alters[column]
+                    ))
+            }
+        )
+    }
+    return(out_list)
+
+    # gridExtra::grid.arrange(grobs = rev(out_list[[1]]), ncol = 1)
 }
