@@ -273,16 +273,17 @@ plot_single_network <- function(
     }
 }
 
-plot_prop_singleans_piechart <- function(
+plot_prop_singleans <- function(
     df,
     mapping,
     attribute,
     attribute_only_cols,
     key_name,
-    palette = "Dark2"
+    palette = "Dark2",
+    plot_type = "grouped_bar"
 ) {
-    p_names <- sprintf("Participant %s", 1:nrow(df))
     n_alters <- n_alters_with_data(df)
+    p_names <- sprintf("Participant %s -- n = %s", 1:nrow(df), n_alters)
 
     # Get proportions for every mapping value
     props <- purrr::map(names(mapping), \(category) {
@@ -301,37 +302,62 @@ plot_prop_singleans_piechart <- function(
         setNames(p_names) %>%
         tibble::rownames_to_column(key_name)
 
-    # Make piechart
-    return(lapply(
-        1:length(p_names),
-        \(column) {
+    # Make plot
+    plot <- switch(
+        plot_type,
+        "pie" = lapply(
+            p_names,
+            \(column) {
+                ggplot(
+                    props,
+                    aes(
+                        x = "",
+                        y = !!ensym(column),
+                        fill = !!ensym(key_name)
+                    )
+                ) +
+                    geom_bar(stat = "identity", width = 1, color = "white") +
+                    coord_polar("y", start = 0) +
+                    scale_fill_brewer(palette = palette) +
+                    theme_void() +
+                    ggtitle(column)
+            }
+        ) %>%
+            gridExtra::grid.arrange(
+                grobs = .,
+                nrow = ceiling(length(p_names) / 2)
+            ),
+        "grouped_bar" = props %>%
+            pivot_longer(
+                cols = -any_of(key_name),
+                names_to = "Participant",
+                values_to = "Proportion"
+            ) %>%
             ggplot(
-                props,
-                aes(
-                    x = "",
-                    y = !!sym(p_names[column]),
-                    fill = !!ensym(key_name)
-                )
+                aes(fill = Participant, y = Proportion, x = !!ensym(key_name))
             ) +
-                geom_bar(stat = "identity", width = 1, color = "white") +
-                coord_polar("y", start = 0) +
-                scale_fill_brewer(palette = palette) +
-                theme_void() +
-                ggtitle(paste(p_names[column], "-- n:", n_alters[column]))
-        }
-    ))
+            geom_bar(position = "dodge", stat = "identity") +
+            scale_fill_brewer(palette = palette),
+        stop(sprintf("Unknown plot_type argument: %s", plot_type))
+    )
+
+    return(plot)
 }
 
 plot_prop_multians_piecharts <- function(df, mapping, attribute, key_name) {
-    p_names <- sprintf("Participant %s", 1:nrow(df))
     n_alters <- n_alters_with_data(df)
+    p_names <- sprintf("Participant %s -- n = %s", 1:nrow(df), n_alters)
 
     # For each alter
     out_list <- vector(mode = "list", length = 15)
     for (alter_num in 1:15) {
         # Get all of the answers for this attribute
         m <- df %>%
-            select(matches(sprintf("^name%s%s_+\\d+$", alter_num, attribute))) %>%
+            select(matches(sprintf(
+                "^name%s%s_+\\d+$",
+                alter_num,
+                attribute
+            ))) %>%
             dplyr::rename_with(
                 ~ names(mapping[mapping == as.integer(gsub("(.*_+)", "", .x))])
             )
@@ -344,13 +370,13 @@ plot_prop_multians_piecharts <- function(df, mapping, attribute, key_name) {
 
         # Make piechart
         out_list[[alter_num]] <- lapply(
-            1:length(p_names),
+            p_names,
             \(column) {
                 ggplot(
                     m,
                     aes(
                         x = "",
-                        y = !!sym(p_names[column]),
+                        y = !!ensym(column),
                         fill = !!ensym(key_name)
                     )
                 ) +
@@ -362,15 +388,49 @@ plot_prop_multians_piecharts <- function(df, mapping, attribute, key_name) {
                     coord_polar("y", start = 0) +
                     scale_fill_brewer(palette = palette) +
                     theme_void() +
-                    ggtitle(paste(
-                        p_names[column],
-                        "-- n:",
-                        n_alters[column]
-                    ))
+                    ggtitle(column)
             }
         )
     }
     return(out_list)
 
     # gridExtra::grid.arrange(grobs = rev(out_list[[1]]), ncol = 1)
+}
+
+
+plot_prop_multians_scatter <- function(df, mapping, attribute, y_name) {
+    plots <- df %>%
+        select(matches(sprintf(
+            "^name\\d+%s_+\\d+$",
+            attribute
+        ))) %>%
+        tibble::rownames_to_column(var = "Participant") %>%
+        pivot_longer(
+            -Participant,
+            names_to = c("Alter", y_name),
+            values_to = "TF",
+            names_pattern = "name(\\d+).*_+(\\d+)",
+            names_transform = list(y_name = as.integer)
+        ) %>%
+        mutate(
+            Alter = paste("Alter", Alter),
+            !!ensym(y_name) := dplyr::recode(
+                !!ensym(y_name),
+                !!!setNames(names(mapping), mapping)
+            )
+        ) %>%
+        filter(TF == 1) %>%
+        group_by(Participant) %>%
+        group_map(
+            ~ ggplot(., aes(x = Alter, y = !!ensym(y_name))) +
+                geom_point(size = 5, color = "Blue") +
+                theme_bw() +
+                ggtitle(paste("Participant", .y[[1]])) +
+                theme(
+                    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+                )
+        ) %>%
+        gridExtra::grid.arrange(grobs = ., nrow = ceiling(nrow(df) / 2))
+
+    return(plots)
 }
