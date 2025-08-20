@@ -117,8 +117,15 @@ organize_list_tidygraphs <- function(persnet_df) {
 
 
 find_isolates <- function(df) {
+    # # # # # # # #
+    # Function: Returns boolean value for each row in dataframe if it is an isolate (no ties)
+    # Inputs: df = Persnet dataframe
+    # Outputs: `boolean vector` T if row is an isolate, F otherwise
+    # # # # # # # #
     return(df %>% select(tie1:tie15) %>% rowSums(na.rm = TRUE) == 0)
 }
+
+############################ Metric Functions ###################################
 
 n_alters_with_data <- function(df) {
     # # # # # # # #
@@ -134,31 +141,33 @@ n_alters_with_data <- function(df) {
 
 n_unique_alters <- function(
     df,
-    q_num = NA,
-    names_per_q = NA,
+    q_nums = 1:3,
+    names_per_q = 5,
     use_more_names = TRUE
 ) {
-    input_NAs <- is.na(c(q_num, names_per_q))
-    if (sum(input_NAs) == 1) {
-        stop("q_num and names_per_num must either both be integers or NA")
-    } else if (all(input_NAs)) {
-        # By default, use all of the questions and all of the names
-        start_name_num <- 1
-        end_name_num <- 15
-        more_names_num <- 1:3
-    } else {
-        # Get the bounding numbers (q_num = 2, names_per_q = 5 -> start at 6, end at 10)
-        end_name_num <- q_num * names_per_q
-        start_name_num <- end_name_num - names_per_q + 1
-        more_names_num <- q_num
-    }
+    # # # # # # # #
+    # Function: Returns the total number of unique names for each row of persnet dataframe
+    # Inputs:
+    #   df = Persnet dataframe
+    #   q_nums = Optional argument. Name-generating questions to consider (by number). Default: 1:3.
+    #   names_per_q = Optional argument. Number of names generated per question. Default: 5.
+    #   use_more_names = Optional argument. Flag to include the names in "more_names" for each question. Default: TRUE.
+    # Outputs:
+    #   `integer vector` the total number of alters according to the arguments for each participant (row) in the input df
+    # # # # # # # #
 
-    # Will always need this
-    col_match <- sprintf("^name%s$", start_name_num:end_name_num)
+    # Get name numbers for each question in q_nums
+    name_nums <- lapply(q_nums, function(x) {
+        ((x * names_per_q) - names_per_q + 1):(x * names_per_q)
+    }) %>%
+        unlist()
+
+    # Will always need the name columns
+    col_match <- sprintf("^name%s$", name_nums)
 
     # Add more names if requested
     if (use_more_names) {
-        col_match <- c(col_match, sprintf("^more_names_%s$", more_names_num))
+        col_match <- c(col_match, sprintf("^more_names_%s$", q_nums))
     }
 
     return(
@@ -235,7 +244,6 @@ prop_of_qnames_in_network <- function(
     )
 }
 
-############################ Metric Functions ###################################
 
 ########################### Network Density ###################################
 
@@ -683,10 +691,6 @@ prop_alters_multians <- function(
     } else {
         # Convert row to a tidygraph object and check if the network is an isolate
         isolate_rows <- find_isolates(df)
-        # isolate_rows <- df %>%
-        #     organize_list_tidygraphs() %>%
-        #     sapply(igraph::vcount) ==
-        #     1
         # Calculate proportions for each row
         props <- rowSums(relevant_cols) / n_alters_with_data(df)
         # Set to NA instead of 0 if row is an isolate
@@ -747,10 +751,7 @@ prop_alters_singleans <- function(
     } else {
         # Convert row to a tidygraph object and check if the network is an isolate
         isolate_rows <- find_isolates(df)
-        # isolate_rows <- df %>%
-        #     organize_list_tidygraphs() %>%
-        #     sapply(igraph::vcount) ==
-        #     1
+
         # Convert all but those in the category to NA and compute the sum of each row.
         # Divide by number of alters
         # NOTE: unlisting allows for mappings to be lists or numeric vectors
