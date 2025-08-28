@@ -133,7 +133,7 @@ all_singleans_attributes <- function(df) {
     # https://stackoverflow.com/questions/977251/regular-expressions-and-negating-a-whole-character-group
     df %>%
         colnames() %>%
-        stringr::str_match("^name\\d+((?!.*_).*)") %>%
+        stringr::str_match("^name\\d+((?!.*___).*)") %>%
         `[`(, 2) %>%
         unique() %>%
         .[!is.na(.) & . != ""]

@@ -457,14 +457,17 @@ node_ens <- function(tidygra, node_index = NULL) {
 
 ############################ Mean Degree ######################################
 
-egoless_mean_degree <- function(tg_graph) {
+egoless_degree <- function(tg_graph, statfun)
+{
     # # # # # # # #
-    # Function: Computes the mean degree of nodes in a personal
-    #           network after removing the ego node.
+    # Function: Computes the degree of nodes in a personal
+    #           network after removing the ego node 
+    #           and applies `statfun` to the result.
     # Inputs:
     #   tg_graph = A tidygraph object representing a personal network
+    #   statfun  = A statistical function to apply to degree value (e.g., `mean`, `max`)
     # Outputs:
-    #   Mean degree of nodes in the network (excluding ego)
+    #   Statistic of degree of nodes in the network (excluding ego)
     # # # # # # # #
 
     tryCatch(
@@ -477,41 +480,8 @@ egoless_mean_degree <- function(tg_graph) {
                 return(0)
             }
 
-            # Else calculate mean degree
-            return(round(mean(igraph::degree(egoless_graph)), 2))
-        },
-        error = function(e) {
-            # If an error occurs, return NA
-            return(NA)
-        }
-    )
-}
-
-########################## Max Degree #########################################
-
-egoless_max_degree <- function(tg_graph) {
-    # # # # # # # #
-    # Function: Computes the maximum degree of nodes in a personal
-    #           network after removing the ego node.
-    # Inputs:
-    #   tg_graph = A tidygraph object representing a personal network
-    # Outputs:
-    #   Maximum degree of nodes in the network (excluding ego)
-    # # # # # # # #
-
-    tryCatch(
-        {
-            # Remove ego
-
-            egoless_graph <- remove_ego_from_igraph(tg_graph)
-
-            # Check if the graph is empty, if so return 0
-            if (igraph::vcount(egoless_graph) == 0) {
-                return(0)
-            }
-
-            # Else calculate max degree
-            return(max(igraph::degree(egoless_graph)))
+            # Else calculate degree
+            return(statfun(igraph::degree(egoless_graph)))
         },
         error = function(e) {
             # If an error occurs, return NA

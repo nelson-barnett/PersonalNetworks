@@ -19,7 +19,8 @@ plot_single_network_node_labels <- function(
     friend_txt = "white",
     family_txt = "white",
     weak_color = "#236782",
-    strong_color = "#c26c21"
+    strong_color = "#c26c21", 
+    repel = FALSE
 ) {
     # # # # #
     # Function: Plots a personal network graph using ggraph, distinguishing
@@ -66,16 +67,14 @@ plot_single_network_node_labels <- function(
             strength_of_tie = ifelse(weight == 1, "weak", "strong")
         ) %>%
         tidygraph::activate(nodes) %>%
-        dplyr::mutate(alter_dummy = ifelse(name != "ego", 1, 0)) %>%
         dplyr::mutate(
+            alter_dummy = ifelse(name != "ego", 1, 0),
             node_fill = dplyr::case_when(
                 name == "ego" ~ "black",
                 grepl("^Friend", name) ~ friend_fill,
                 grepl("^Family", name) ~ family_fill,
                 .default = "white"
-            )
-        ) %>%
-        dplyr::mutate(
+            ),
             node_text_color = dplyr::case_when(
                 name == "ego" ~ "white",
                 grepl("^Friend", name) ~ friend_txt,
@@ -114,7 +113,7 @@ plot_single_network_node_labels <- function(
             geom_node_point(
                 aes(color = factor(alter_dummy)),
                 size = node_size,
-                show.legend = FALSE
+                show.legend = FALSE,
             ) +
             scale_colour_manual(values = c('black', 'grey66')) +
             geom_node_label(
@@ -123,6 +122,7 @@ plot_single_network_node_labels <- function(
                 label.padding = unit(0.25, "lines"),
                 label.size = 0.5,
                 show.legend = FALSE,
+                repel = repel
             ) +
             scale_color_identity() +
             scale_fill_identity() +
@@ -130,8 +130,6 @@ plot_single_network_node_labels <- function(
             theme_graph(base_family = "Helvetica-Narrow") +
             scale_x_continuous(expand = expansion(.15)) +
             scale_y_continuous(expand = expansion(.25))
-
-        return(tg_plot)
     } else {
         # Plot network without ego as focal point
         tg_plot <- ggraph(tidygra, layout = "fr") +
@@ -162,9 +160,8 @@ plot_single_network_node_labels <- function(
             scale_fill_identity() +
             ggtitle(ttl) +
             theme_graph(base_family = "Helvetica-Narrow")
-
-        return(tg_plot)
     }
+    return(tg_plot)
 }
 
 ###################### Network Montage Visualization ##########################
@@ -207,8 +204,6 @@ plot_single_network <- function(
                 show.legend = FALSE
             ) +
             theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-        return(tg_plot)
     } else {
         # Check if ego is present in the graph, and if so, focus layout on ego
         node_names <- unique(tidygra %N>% dplyr::pull(name))
@@ -235,7 +230,7 @@ plot_single_network <- function(
                 scale_edge_linetype_manual(
                     values = c("weak" = "solid", "strong" = "solid")
                 ) +
-                scale_edge_colour_manual(
+                scale_edge_color_manual(
                     values = c("weak" = weak_color, "strong" = strong_color)
                 ) +
                 geom_node_point(
@@ -245,8 +240,6 @@ plot_single_network <- function(
                 ) +
                 scale_colour_manual(values = c('black', 'grey66')) +
                 theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-            return(tg_plot)
         } else {
             # Plot network without ego as focal point
             tg_plot <- ggraph(tidygra, layout = "fr") +
@@ -267,10 +260,9 @@ plot_single_network <- function(
                     show.legend = FALSE
                 ) +
                 theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
-
-            return(tg_plot)
         }
     }
+    return(tg_plot)
 }
 
 plot_prop_singleans <- function(
@@ -303,7 +295,7 @@ plot_prop_singleans <- function(
         tibble::rownames_to_column(key_name)
 
     # Make plot
-    plot <- switch(
+    plt <- switch(
         plot_type,
         "pie" = lapply(
             p_names,
@@ -341,7 +333,7 @@ plot_prop_singleans <- function(
         stop(sprintf("Unknown plot_type argument: %s", plot_type))
     )
 
-    return(plot)
+    return(plt)
 }
 
 plot_prop_multians_piecharts <- function(df, mapping, attribute, key_name) {
