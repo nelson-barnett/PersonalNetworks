@@ -96,7 +96,7 @@ organize_row_to_tidygraph <- function(df_row_input) {
     return(tgra)
 }
 
-organize_list_tidygraphs <- function(persnet_df) {
+organize_list_tidygraphs <- function(persnet_df, sort_inds = NULL) {
     # # # # # # # #
     # Function: Converts a personal network data frame into a list of tidygraph
     #           objects, with each row representing an individual network.
@@ -457,11 +457,10 @@ node_ens <- function(tidygra, node_index = NULL) {
 
 ############################ Mean Degree ######################################
 
-egoless_degree <- function(tg_graph, statfun)
-{
+egoless_degree <- function(tg_graph, statfun) {
     # # # # # # # #
     # Function: Computes the degree of nodes in a personal
-    #           network after removing the ego node 
+    #           network after removing the ego node
     #           and applies `statfun` to the result.
     # Inputs:
     #   tg_graph = A tidygraph object representing a personal network

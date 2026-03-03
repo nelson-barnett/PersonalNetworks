@@ -19,7 +19,7 @@ plot_single_network_node_labels <- function(
     friend_txt = "white",
     family_txt = "white",
     weak_color = "#236782",
-    strong_color = "#c26c21", 
+    strong_color = "#c26c21",
     repel = FALSE
 ) {
     # # # # #
@@ -115,7 +115,7 @@ plot_single_network_node_labels <- function(
                 size = node_size,
                 show.legend = FALSE,
             ) +
-            scale_colour_manual(values = c('black', 'grey66')) +
+            # scale_colour_manual(values = c('black', 'grey66')) +
             geom_node_label(
                 aes(label = name, fill = node_fill, color = node_text_color),
                 size = node_size,
@@ -170,6 +170,8 @@ plot_single_network <- function(
     tidygra,
     edge_size = 0.5,
     node_size = 2,
+    friend_fill = "#89b53c",
+    family_fill = "#007080",
     weak_color = "#236782",
     strong_color = "#c26c21"
 ) {
@@ -215,7 +217,15 @@ plot_single_network <- function(
                 strength_of_tie = ifelse(weight == 1, "weak", "strong")
             ) %>%
             tidygraph::activate(nodes) %>%
-            dplyr::mutate(alter_dummy = ifelse(name != 'ego', 1, 0))
+            dplyr::mutate(
+                alter_dummy = ifelse(name != 'ego', 1, 0),
+                node_fill = dplyr::case_when(
+                    name == "ego" ~ "black",
+                    grepl("^Friend", name) ~ friend_fill,
+                    grepl("^Family", name) ~ family_fill,
+                    .default = "grey"
+                ),
+            )
 
         if ("ego" %in% node_names) {
             focus_index <- which(node_names == "ego")
@@ -228,18 +238,18 @@ plot_single_network <- function(
                     show.legend = FALSE
                 ) +
                 scale_edge_linetype_manual(
-                    values = c("weak" = "solid", "strong" = "solid")
+                    values = c("weak" = "dashed", "strong" = "solid")
                 ) +
                 scale_edge_color_manual(
                     values = c("weak" = weak_color, "strong" = strong_color)
                 ) +
                 geom_node_point(
-                    aes(color = factor(alter_dummy)),
+                    aes(color = node_fill),
                     size = node_size,
                     show.legend = FALSE
                 ) +
-                scale_colour_manual(values = c('black', 'grey66')) +
-                theme_graph(plot_margin = unit(c(0, 0, 0, 0), "mm"))
+                scale_colour_identity() +
+                theme_graph(plot_margin = unit(c(0.01, 0.01, 0.01, 0.01), "mm"))
         } else {
             # Plot network without ego as focal point
             tg_plot <- ggraph(tidygra, layout = "fr") +
