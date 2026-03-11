@@ -58,7 +58,7 @@ names_to_relat <- function(df, mapping) {
             # Find corresponding nameNUMrelat___NUM columns
             relat_cols <- dplyr::select(
                 persnet_row,
-                dplyr::matches(sprintf("^name%srelat_*\\d+$", i))
+                dplyr::matches(sprintf("^name%srelat_+\\d+$", i))
             )
             if (!any(relat_cols)) {
                 next
@@ -100,5 +100,41 @@ names_to_relat <- function(df, mapping) {
     }
 
     # Apply the function to each row of df and reconstruct the table
-    return(df %>% rowwise() %>% summarize(F(across()))) #### TODO: Update F(across()) (depreciated now)
+    return(df %>% rowwise() %>% summarize(F(across(everything())))) #### TODO: Update F(across()) (depreciated now)
+}
+
+all_multians_attributes <- function(df) {
+    # # # # # # # #
+    # Function: Returns the attribute for all multianswer questions about alters
+    # Inputs: 
+    #   df = A personal network dataframe 
+    # Outputs: 
+    #   `character vector` the attributes that can have multiple answers
+    # # # # # # # #
+
+    df %>%
+        colnames() %>%
+        stringr::str_match("^name\\d+(.*?)(?=___)") %>%
+        `[`(, 2) %>%
+        unique() %>%
+        .[!is.na(.) & . != ""]
+}
+
+all_singleans_attributes <- function(df) {
+    # # # # # # # #
+    # Function: Returns the attribute for all single answer questions about alters
+    # Inputs: 
+    #   df = A personal network dataframe 
+    # Outputs: 
+    #   `character vector` the attributes that can have only one answer 
+    # # # # # # # # 
+
+    # See here for regex explanation: 
+    # https://stackoverflow.com/questions/977251/regular-expressions-and-negating-a-whole-character-group
+    df %>%
+        colnames() %>%
+        stringr::str_match("^name\\d+((?!.*___).*)") %>%
+        `[`(, 2) %>%
+        unique() %>%
+        .[!is.na(.) & . != ""]
 }

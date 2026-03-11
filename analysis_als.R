@@ -9,8 +9,9 @@
 # purrr (1.0.2); igraph (2.0.3); patchwork (1.3.0), ggraph, patchwork, cowplot,
 # rstudioapi
 # AUTHORS: Zachary Wehrwein, Liam McCafferty, Amar Dhand
+# UPDATED AND ADAPTED BY NELSON BARNETT
 # CREATED: 03/26/2025
-# LATEST:  06/08/2025
+# LATEST:  03/03/2026
 # PSERIES: NA
 # NSERIES: NA
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -38,35 +39,32 @@ library(rstudioapi)
 #Clearing Working Directory
 rm(list = ls())
 
-
-### Locate data
-data_file <- "fake_data.csv"
-dict_file <- "codebook.csv"
-
+### Path info
+data_file <- ""
 out_dir <- ""
-out_suffix <- as.character(Sys.Date())
+dict_file <- "PersonalNetworkSurvey_RedcapCodebook.csv"
 
-#Automatically set working directory, requires rstudioapi package. If not working set WD manually
-#to do so manually go to Session -> Set Working Directory -> To Source File location
-#copy paste result from console over following commented line of code:
-#Example:
-# setwd("~/Desktop/network")
-setwd(dirname(getActiveDocumentContext()$path))
+# Settings/flags
+MAKE_FIGS <- TRUE
+use_relat_names_in_figs <- TRUE
+replace_ids_in_figs <- TRUE
+repel_labels <- FALSE
+is_v2 <- TRUE
+
+out_suffix <- as.character(Sys.Date())
+metrics_out_name <- "persnet_metrics"
 
 # Get funcs
 source("utils.R")
 source("metrics.R")
 source("viz.R")
 
-# Flags
-MAKE_FIGS <- FALSE
-
 ############# ANALYSIS #############
 #Importing data
 df_input <- read.csv(
     data_file,
     stringsAsFactors = FALSE,
-    colClasses = c(zip = "character")
+    colClasses = c(zip_code = "character", zip_code_v2 = "character")
 ) #this reads in zip retains 0s
 
 df_dict <- read.csv(dict_file)
@@ -74,110 +72,83 @@ df_dict <- read.csv(dict_file)
 ############### EGO ###############
 
 ################# Extracting values #################
-### record_id
+### record_id is always generated
 record_id = df_input$record_id
 
-### age
-age = df_input$age
+# Set values based on v1/v2 flag
+age_col <- ifelse(is_v2, "age_v2", "age")
+race_col <- ifelse(is_v2, "race_v2", "race")
+employ_col <- ifelse(is_v2, "employment_v2", "employment")
+smoke_col <- ifelse(is_v2, "smoke_v2", "smoke")
 
-### sex
-sex_map <- get_codebook_mapping(df_dict, "sex")
-sex <- factor(df_input$sex, levels = sex_map, labels = names(sex_map))
+# Data only collected during demographic v1
+if (!is_v2) {
+    ### sex
+    sex_map <- get_codebook_mapping(df_dict, "sex")
+    sex <- names(sex_map[pull(df_input, "sex")])
+
+    ### Education
+    edu_map <- get_codebook_mapping(df_dict, "education")
+    education <- factor(
+        pull(df_input, "education"),
+        levels = edu_map,
+        labels = names(edu_map)
+    )
+
+    # Ethnicity
+    eth_map <- get_codebook_mapping(df_dict, "ethnicity")
+    ethnicity <- names(eth_map[pull(df_input, "ethnicity")])
+
+    # Region of onset
+    region_map <- get_codebook_mapping(df_dict, "region")
+    region <- extract_ego_multi_attributes(df_input, "region", region_map)
+}
+
+### age
+age = pull(df_input, age_col)
 
 ### race
 race_map <- get_codebook_mapping(df_dict, "race")
-ego_races <- extract_ego_multi_attributes(df_input, "race", race_map)
+ego_races <- extract_ego_multi_attributes(df_input, race_col, race_map)
 
 ### Employment
 employ_map <- get_codebook_mapping(df_dict, "employment")
-employment <- factor(
-    df_input$employment,
-    levels = employ_map,
-    labels = names(employ_map)
-)
+ego_employ <- extract_ego_multi_attributes(df_input, employ_col, employ_map)
 
-### Education
-edu_map <- get_codebook_mapping(df_dict, "edu")
-education <- factor(df_input$edu, levels = edu_map, labels = names(edu_map))
-
-### Zip
-zip = as.character(df_input$zip)
-
-### Occupation
-occ_map <- get_codebook_mapping(df_dict, "occupation")
-occupation <- factor(
-    df_input$occupation,
-    levels = occ_map,
-    labels = names(occ_map)
-)
-
-### Income
-income_map <- get_codebook_mapping(df_dict, "income")
-income <- factor(
-    df_input$income,
-    levels = income_map,
-    labels = names(income_map)
-)
-
-### Married
-marry_map <- get_codebook_mapping(df_dict, "married")
-married <- factor(
-    df_input$married,
-    levels = marry_map,
-    labels = names(marry_map)
-)
-
-## Live_alone
-live_map <- get_codebook_mapping(df_dict, "live_alone")
-live_alone <- factor(
-    df_input$live_alone,
-    levels = live_map,
-    labels = names(live_map)
-)
-
-### household_number
-household_number <- df_input$household_number
 
 ### Smoking
 smoke_map <- get_codebook_mapping(df_dict, "smoke")
-smoke <- factor(df_input$smoke, levels = smoke_map, labels = names(smoke_map))
-
-### Alcohol
-alc_map <- get_codebook_mapping(df_dict, "alcohol")
-alcohol <- factor(df_input$alcohol, levels = alc_map, labels = names(alc_map))
-
-### Exercise
-exercise_map <- get_codebook_mapping(df_dict, "exercise")
-exercise <- factor(
-    df_input$exercise,
-    levels = exercise_map,
-    labels = names(exercise_map)
+smoke <- factor(
+    pull(df_input, smoke_col),
+    levels = smoke_map,
+    labels = names(smoke_map)
 )
 
-### Diet
-diet_map <- get_codebook_mapping(df_dict, "diet")
-diet <- factor(df_input$diet, levels = diet_map, labels = names(diet_map))
-
-### Health probs
-health_map <- get_codebook_mapping(df_dict, "health")
-ego_health_probs <- extract_ego_multi_attributes(df_input, "health", health_map)
+### Zip
+zip = as.character(df_input$zip_code)
 
 ################# Network Stats #################
-network_size = total_alters_df(df_input)
+network_size = n_unique_alters(df_input, use_more_names = TRUE)
 density = egoless_density_df(df_input)
 
 gra_list <- organize_list_tidygraphs(df_input)
 constraint = sapply(gra_list, node_constraint)
 effsize = sapply(gra_list, node_ens)
-mean_degree = sapply(gra_list, egoless_mean_degree)
-max_degree = sapply(gra_list, egoless_max_degree)
+mean_degree = sapply(gra_list, egoless_degree, mean)
+max_degree = sapply(gra_list, egoless_degree, max)
 
 ############### ALTERS ###############
 age_sd <- numeric_attr_sd(df_input, "age")
 
 ################# IQV #################
 gender_map <- get_codebook_mapping(df_dict, "name1sex")
-iqv_sex <- attribute_iqv(
+iqv_sex_datanorm <- attribute_iqv(
+    df_input,
+    "sex",
+    gender_map,
+    normalize_by = "data"
+)
+iqv_sex_mapnorm <- attribute_iqv(
     df_input,
     "sex",
     gender_map,
@@ -190,18 +161,16 @@ educ_map <- list(
     college_grad = c(5, 6),
     dont_know = 99
 )
-iqv_educ <- attribute_iqv(
+iqv_educ_datanorm <- attribute_iqv(
     df_input,
     "educ",
     educ_map,
-    normalize_by = "mapping"
+    normalize_by = "data"
 )
-
-race_map <- get_codebook_mapping(df_dict, "name1race")
-iqv_race <- attribute_iqv(
+iqv_educ_mapnorm <- attribute_iqv(
     df_input,
-    "race",
-    race_map,
+    "educ",
+    educ_map,
     normalize_by = "mapping"
 )
 
@@ -209,6 +178,8 @@ iqv_race <- attribute_iqv(
 prop_q1_in_network <- prop_of_qnames_in_network(df_input, 1)
 prop_q2_in_network <- prop_of_qnames_in_network(df_input, 2)
 prop_q3_in_network <- prop_of_qnames_in_network(df_input, 3)
+num_unique_alters_namegen <- n_unique_alters(df_input, use_more_names = FALSE)
+num_unique_alters_total <- n_unique_alters(df_input, use_more_names = TRUE)
 
 # All mappings will be the same, so just take the first one
 relat_map <- get_codebook_mapping(df_dict, "name1relat")
@@ -217,6 +188,14 @@ kin_prop <- prop_alters_multians(
     c("Spouse", "Family"),
     relat_map,
     "relat"
+)
+
+health_map <- get_codebook_mapping(df_dict, "name1health")
+als_illness_prop <- prop_alters_multians(
+    df_input,
+    c("ALS", "Serious Illness"),
+    health_map,
+    "health"
 )
 
 speak_map <- get_codebook_mapping(df_dict, "name1speak")
@@ -243,46 +222,13 @@ far_dist_prop <- prop_alters_singleans(
     "dist"
 )
 
-alc_map <- get_codebook_mapping(df_dict, "name1alcohol")
-heavy_drinkers_prop <- prop_alters_singleans(
+als_map <- get_codebook_mapping(df_dict, "name1als")
+met_through_als_prop <- prop_alters_singleans(
     df_input,
-    c("Yes", "No"),
-    alc_map,
-    "alcohol"
+    "Yes",
+    als_map,
+    "als"
 )
-
-smoke_map <- get_codebook_mapping(df_dict, "name1smoke")
-smoking_prop <- prop_alters_singleans(
-    df_input,
-    c("Yes", "No"),
-    smoke_map,
-    "smoke"
-)
-
-exer_map <- get_codebook_mapping(df_dict, "name1exer")
-no_exercise_prop <- prop_alters_singleans(
-    df_input,
-    "No",
-    exer_map,
-    "exer"
-)
-
-diet_map <- get_codebook_mapping(df_dict, "name1diet")
-bad_diet_prop <- prop_alters_singleans(
-    df_input,
-    "No",
-    diet_map,
-    "diet"
-)
-
-health_map <- get_codebook_mapping(df_dict, "name1health")
-health_prob_prop <- prop_alters_multians(
-    df_input,
-    names(health_map[health_map != 0 & health_map != 99]),
-    health_map,
-    "health"
-)
-
 
 ################# Blau #################
 blau_gender <- blau_alter_heterophily(df_input, "sex", gender_map)
@@ -293,56 +239,69 @@ blau_speak <- blau_alter_heterophily(df_input, "speak", speak_map)
 length_map <- get_codebook_mapping(df_dict, "name1length")
 blau_length <- blau_alter_heterophily(df_input, "length", length_map)
 
+
 ############# MAKE OUTPUTS #############
 ############### Data Table ###############
-my_df_clean = tibble::tibble(
+
+if (is_v2) {
+    v1_vars <- c(
+        "sex",
+        paste0("race", 1:2),
+        "education",
+        "ethnicity",
+        paste0("region", 1:5)
+    )
+
+    for (x in v1_vars) {
+        assign(x, "see v1")
+    }
+} else {
+    race1 <- sapply(ego_races, "[", 1)
+    race2 <- sapply(ego_races, "[", 2)
+    region1 <- sapply(region, "[", 1)
+    region2 <- sapply(region, "[", 2)
+}
+
+
+df_clean = tibble::tibble(
     record_id = record_id,
     age = age,
     sex = sex,
-    race1 = sapply(ego_races, "[", 1),
-    race2 = sapply(ego_races, "[", 2),
-    zip = zip,
+    race1 = race1,
+    race2 = race2,
+    region1 = region1,
+    region2 = region2,
+    ethnicity = ethnicity,
     education = education,
-    employment = employment,
-    occupation = occupation,
-    income = income,
-    married = married,
-    live_alone = live_alone,
-    household_number = household_number,
-    ego_alcohol = alcohol,
-    ego_smoke = smoke,
-    ego_exercise = exercise,
-    ego_healthy_diet = diet,
-    health_problems1 = sapply(ego_health_probs, "[", 1),
-    health_problems2 = sapply(ego_health_probs, "[", 2),
-    health_problems3 = sapply(ego_health_probs, "[", 3),
-    health_problems4 = sapply(ego_health_probs, "[", 4),
+    employment = sapply(ego_employ, "[", 1),
+    zip = zip,
     network_size = network_size,
     density = density,
     constraint = constraint,
     effsize = effsize,
     max_degree = max_degree,
     mean_degree = mean_degree,
-    kin_prop = round(kin_prop, digits = 2),
+    kin_prop = kin_prop,
+    als_or_illness_prop = als_illness_prop,
+    prop_of_network_in_q1 = prop_q1_in_network,
+    prop_of_network_in_q2 = prop_q2_in_network,
+    prop_of_network_in_q3 = prop_q3_in_network,
+    n_unique_alters_namegen = num_unique_alters_namegen,
+    n_unique_alters_total = num_unique_alters_total,
+    prop_through_als = met_through_als_prop,
     age_sd = round(age_sd, digits = 2),
-    IQV_sex = round(iqv_sex, digits = 2),
-    IQV_educ = round(iqv_educ, digits = 2),
+    iqv_sex_datanorm = round(iqv_sex_datanorm, digits = 2),
+    IQV_sex_all_options_norm = round(iqv_sex_mapnorm, digits = 2),
+    iqv_educ_datanorm = round(iqv_educ_datanorm, digits = 2),
+    iqv_educ_all_options_norm = round(iqv_educ_mapnorm, digits = 2),
     weak_freq_prop = round(weak_freq_prop, digits = 2),
     weak_dur_prop = round(weak_dur_prop, digits = 2),
     far_dist_prop = round(far_dist_prop, digits = 2),
-    heavy_drinkers_prop = round(heavy_drinkers_prop, digits = 2),
-    smoking_prop = round(smoking_prop, digits = 2),
-    no_exercise_prop = round(no_exercise_prop, digits = 2),
-    bad_diet_prop = round(bad_diet_prop, digits = 2),
-    health_prob_prop = round(health_prob_prop, digits = 2),
     blau_gender = round(blau_gender, digits = 2),
     blau_educ = round(blau_educ, digits = 2),
     blau_distance = round(blau_dist, digits = 2),
     blau_length = round(blau_length, digits = 2),
-    blau_speak = round(blau_speak, digits = 2),
-    prop_q1 = prop_q1_in_network,
-    prop_q2 = prop_q2_in_network,
-    prop_q3 = prop_q3_in_network
+    blau_speak = round(blau_speak, digits = 2)
 )
 
 df_clean$zip <- as.character(df_clean$zip) #double check zip as string
@@ -353,7 +312,7 @@ write.csv(
     df_clean,
     paste(
         out_dir,
-        "Clean_Data",
+        metrics_out_name,
         ifelse(out_suffix != "", paste("_", out_suffix, sep = ""), ""),
         ".csv",
         sep = ""
@@ -361,14 +320,39 @@ write.csv(
     row.names = FALSE
 )
 
+############### FIGURES ###############
 if (MAKE_FIGS) {
-    ############### FIGURES ###############
-    df_relat_names <- names_to_relat(df_input, relat_map)
-    list_tidygras <- organize_list_tidygraphs(df_relat_names)
+    if (replace_ids_in_figs) {
+        df_input <- df_input %>%
+            mutate(
+                record_id = gsub(".*-", "", df_input$record_id) %>%
+                    as.numeric() %>%
+                    paste0("P", .)
+            )
+    }
+
+    df_for_figs <- df_input %>%
+        mutate(n_alts_with_data = n_alters_with_data(.)) %>%
+        arrange(desc(n_alts_with_data))
+
+    if (use_relat_names_in_figs) {
+        names(relat_map) <- gsub("\\s+", "\n", names(relat_map))
+        df_for_figs <- names_to_relat(df_for_figs, relat_map)
+    }
+
+    list_tidygras <- organize_list_tidygraphs(df_for_figs)
+
     list_network_plots_labels <- mapply(
         plot_single_network_node_labels,
         tidygra = list_tidygras,
-        ego_name = record_id,
+        ego_name = df_for_figs$record_id,
+        repel = repel_labels,
+        fig_title = paste(
+            "ID:",
+            df_for_figs$record_id,
+            "\nnum alters shown:",
+            df_for_figs$n_alts_with_data
+        ),
         SIMPLIFY = FALSE
     )
 
@@ -396,9 +380,6 @@ if (MAKE_FIGS) {
     graph_scale <- 4
     ## for ~100 networks, we recommend 8.5, 11, and 2
 
-    # Creating list of graphs
-    list_tidygras <- organize_list_tidygraphs(df_input)
-
     # Gives how many graphs the montage will contain
     graph_count <- length(list_tidygras)
 
@@ -416,14 +397,15 @@ if (MAKE_FIGS) {
     list_network_plots <- lapply(
         list_tidygras,
         plot_single_network,
-        edge_size = 0.25 * est_graph_scale,
-        node_size = 1 * est_graph_scale
+        edge_size = 0.1 * est_graph_scale,
+        node_size = 0.5 * est_graph_scale
     )
+
     # Constructing grid of plots, note this is where we set how many columns the grid will contain,
     #  therefore setting the size and aspect ratio of each plot.
     wrap_list_network_plots <- wrap_plots(
         plotlist = list_network_plots,
-        ncol = est_column_count
+        ncol = est_column_count,
     )
 
     ############### WRITE ###############
@@ -444,6 +426,33 @@ if (MAKE_FIGS) {
         # units = "in",
         # dpi = 300
     )
+
+    i = 0
+    single_networks_out_dir <- paste0(
+        out_dir,
+        "single_networks",
+        "_",
+        out_suffix,
+        "/"
+    )
+    dir.create(single_networks_out_dir, showWarnings = FALSE)
+    for (plt in list_network_plots_labels) {
+        i = i + 1
+        ggsave(
+            paste(
+                single_networks_out_dir,
+                "Single_Network",
+                df_for_figs$record_id[[i]],
+                ifelse(out_suffix != "", paste("_", out_suffix, sep = ""), ""),
+                ".png",
+                sep = ""
+            ),
+            plt,
+            dpi = 150,
+            width = 12,
+            height = 10
+        )
+    }
 
     pdf(
         paste(
